@@ -1,0 +1,52 @@
+USING PAYLOAD SIZE = 8
+USING OUTSTANDING_REQ = 1
+[CONS:info] Device name: mlx5_0, Device verbs name: uverbs0, Extra info: NodeType::CA TransportType::IB
+[CONS:info] Binding to the first port of the device... OK
+[CONS:info] Binded on (port_id, port_lid) = (1, 141)
+[CB:info] PD 'primary' registered
+[CB:info] Buffer 'shared-buf' of size 1073741824 allocated
+[CB:info] MR 'shared-mr' under PD 'primary' registered with buf 'shared-buf' and rights 7
+[CB:info] CQ 'cq-replication' registered
+[CB:info] CQ 'cq-leader-election' registered
+[CE:info] Publishing qp qp-replication-3-for-1
+[CE:info] Publishing qp qp-replication-3-for-2
+announce_ready: value at qp-replication-3-ready(announce) ready(announce)
+[CE:info] Publishing qp qp-leader-election-3-for-1
+[CE:info] Publishing qp qp-leader-election-3-for-2
+announce_ready: value at qp-leader-election-3-ready(announce) ready(announce)
+[CE:info] Loopback connection was added
+shared_memory_addr: 47817054683200
+memory size: 34603008
+[CONS:info] Scratchpad memory :: slot size: 1048576 bytes, total size: 34603008 bytes.
+[CONS:info] Log allocation... OK
+[CONS:info] Log (address: 0x2b7d489f0040, size: 1039138816 bytes)
+[CE:info] Connected with qp-replication-1-for-3
+[CE:info] Connected with qp-replication-2-for-3
+announce_ready: value at qp-replication-3-ready(connect) ready(connect)
+[CE:info] Connected with qp-leader-election-1-for-3
+[CE:info] Connected with qp-leader-election-2-for-3
+announce_ready: value at qp-leader-election-3-ready(connect) ready(connect)
+wait_ready: value at qp-replication-1-ready(connect) 
+[CE:info] Loopback connection was established
+[CB:info] PD 'hamsaz' registered
+[CB:info] Buffer 'deposit-buf' of size 1048576 allocated
+[CB:info] MR 'deposit-mr' under PD 'hamsaz' registered with buf 'deposit-buf' and rights 7
+[CB:info] CQ 'cq-deposit' registered
+[CE:info] Publishing qp qp-deposit-3-for-1
+[CE:info] Publishing qp qp-deposit-3-for-2
+announce_ready: value at qp-deposit-3-ready(announce) ready(announce)
+[CONS:info] deposit_memory_addr: 0x2b7d871ba040
+overlay created
+memory size: 1048576
+[CONS:info] Hamsaz memory :: slot size: 1048576 bytes, total size: 1048576 bytes.
+deposit memory created
+[CONS:info] Deposit log allocation for deposit... OK
+[CONS:info] Deposit log deposit(address: 0x2b7d872ba040, size: 0 bytes)
+here
+here2
+wait_ready: value at qp-deposit-1-ready(announce) 
+here3
+[CE:info] Connected with qp-deposit-1-for-3
+[CE:info] Connected with qp-deposit-2-for-3
+here4
+announce_ready: value at qp-deposit-3-ready(connect) ready(connect)

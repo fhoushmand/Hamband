@@ -1,0 +1,19 @@
+mlx5_0 uverbs0 NodeType::CA TransportType::IB
+Binded successful? 1
+(port_id, port_lid) = (1, 104)
+[CB:info] PD 'primary' registered
+[CB:info] Buffer 'shared-buf' of size 1073741824 allocated
+[CB:info] MR 'shared-mr' under PD 'primary' registered with buf 'shared-buf' and rights 7
+[CB:info] CQ 'cq' registered
+[CE:info] Publishing qp qp-1-for-2
+[CE:info] Publishing qp qp-1-for-3
+announce_ready: value at qp-1-ready(announce) ready(announce)
+wait_ready: value at qp-2-ready(announce) 
+Waiting (5 sec) for all processes to fetch the connections
+[CE:info] Connected with qp-2-for-1
+[CE:info] Connected with qp-3-for-1
+announce_ready: value at qp-1-ready(connect) ready(connect)
+memory size: 34603008
+[2021-10-14 14:45:09.277] [info] [memory.cpp:74] Scratchpad memory :: slot size: 1048576 bytes, total size: 34603008 bytes.
+log_offset: 34603008
+logmem_size: 1039138816
