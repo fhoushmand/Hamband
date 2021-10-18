@@ -1,4 +1,4 @@
-i05 i06 i07 i08
+i04 i06 i07 i08
 slab class   1: chunk size        96 perslab   10922
 slab class   2: chunk size       120 perslab    8738
 slab class   3: chunk size       152 perslab    6898
@@ -49,8 +49,8 @@ slab class  42: chunk size   1048576 perslab       1
 <28 server listening (udp)
 <29 server listening (udp)
 <28 server listening (udp)
-<29 server listening (udp)
 <28 server listening (udp)
+<29 server listening (udp)
 <29 server listening (udp)
 <29 server listening (udp)
 <30 new auto-negotiating client connection
@@ -119,7 +119,6 @@ slab class  42: chunk size   1048576 perslab       1
 <32 get qp-3-ready(connect)
 >32 sending key qp-3-ready(connect)
 >32 END
-<32 connection closed.
 <30 get qp-2-for-1
 >30 sending key qp-2-for-1
 >30 END
@@ -131,7 +130,6 @@ slab class  42: chunk size   1048576 perslab       1
 <30 get qp-1-ready(connect)
 >30 sending key qp-1-ready(connect)
 >30 END
-<30 connection closed.
 <31 get qp-1-for-2
 >31 sending key qp-1-for-2
 >31 END
@@ -143,4 +141,9 @@ slab class  42: chunk size   1048576 perslab       1
 <31 get qp-2-ready(connect)
 >31 sending key qp-2-ready(connect)
 >31 END
+<32 quit
+<32 connection closed.
+<30 quit
+<30 connection closed.
+<31 quit
 <31 connection closed.

@@ -13,7 +13,63 @@ Waiting (5 sec) for all processes to fetch the connections
 [CE:info] Connected with qp-2-for-1
 [CE:info] Connected with qp-3-for-1
 announce_ready: value at qp-1-ready(connect) ready(connect)
-memory size: 34603008
-[2021-10-14 14:45:09.277] [info] [memory.cpp:74] Scratchpad memory :: slot size: 1048576 bytes, total size: 34603008 bytes.
-log_offset: 34603008
-logmem_size: 1039138816
+log_offset: 0
+logmem: 0x2ac8d70ad040
+logmem_size: 1073741824
+
+
+
+writing 1- to: 2 at: 2b67386c9080
+-------
+writing 1- to: 3 at: 2aaad8647080
+-------
+========
+finished writing, now waiting...
+done waiting
+writing 1- to: 2 at: 2b67386c90c0
+-------
+writing 1- to: 3 at: 2aaad86470c0
+-------
+========
+finished writing, now waiting...
+done waiting
+writing 1- to: 2 at: 2b67386c9100
+-------
+writing 1- to: 3 at: 2aaad8647100
+-------
+========
+finished writing, now waiting...
+done waiting
+writing 1- to: 2 at: 2b67386c9140
+-------
+writing 1- to: 3 at: 2aaad8647140
+-------
+========
+finished writing, now waiting...
+done waiting
+writing 1- to: 2 at: 2b67386c9180
+-------
+writing 1- to: 3 at: 2aaad8647180
+-------
+========
+finished writing, now waiting...
+done waiting
+start reading 1 log
+buffer: 1-
+buffer: 1-
+buffer: 1-
+buffer: 1-
+buffer: 1-
+start reading 2 log
+buffer: 2-
+buffer: 2-
+buffer: 2-
+buffer: 2-
+buffer: 2-
+start reading 3 log
+buffer: 3-
+buffer: 3-
+buffer: 3-
+buffer: 3-
+buffer: 3-
+end

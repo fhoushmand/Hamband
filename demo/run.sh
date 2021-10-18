@@ -4,9 +4,10 @@
 #SBATCH --ntasks=4
 #SBATCH --cpus-per-task=4
 #SBATCH --output="result.log"
-#SBATCH --mem=5G
-#SBATCH --nodelist i05,i06,i07,i08
+#SBATCH --mem=15G
 #SBATCH -p short # This is the default partition, you can use any of the following; intel, batch, highmem, gpue
+#SBATCH --exclusive
+#SBATCH --constraint="intel"
 
 nodes=($( scontrol show hostnames $SLURM_NODELIST ))
 nnodes=${#nodes[@]}
@@ -30,4 +31,4 @@ for i in $( seq 1 $last ); do
         ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./build/bin/dorydemo $i > $i.log &"
 done
 
-sleep 240
+sleep 60

@@ -4,10 +4,10 @@
 #SBATCH --ntasks=4
 #SBATCH --cpus-per-task=4
 #SBATCH --output="result.log"
-#SBATCH --mem=5G
-#SBATCH --nodelist i55,i56,i57,i58
+#SBATCH --mem=10G
 #SBATCH -p short # This is the default partition, you can use any of the following; intel, batch, highmem, gpu
 #SBATCH --exclusive
+#SBATCH --constraint="amd"
 
 nodes=($( scontrol show hostnames $SLURM_NODELIST ))
 nnodes=${#nodes[@]}

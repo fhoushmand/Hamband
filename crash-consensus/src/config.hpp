@@ -11,6 +11,8 @@ static const char heartbeatThreadName[] = "thd_heartbeat";
 static const char followerThreadName[] = "thd_follower";
 static const char fileWatcherThreadName[] = "thd_filewatcher";
 
+static const char logger_prefix[] = "CONS";
+
 static constexpr int handoverThreadBankAB_ID = 0;
 static constexpr int fileWatcherThreadBankAB_ID = 10;
 

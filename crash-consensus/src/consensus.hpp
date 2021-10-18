@@ -22,7 +22,6 @@
 //#include "branching.hpp"
 #include "config.hpp"
 //#include "log.hpp"
-#include "logger.hpp"
 //#include "memory.hpp"
 #include "pinning.hpp"
 #include "response-tracker.hpp"

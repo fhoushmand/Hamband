@@ -134,6 +134,74 @@ class Log {
     uint64_t len;
   };
 
+
+  class CallEntry {
+   public:
+    CallEntry() {}
+
+    CallEntry(uint8_t* start, size_t remaining_space)
+        : base{start},
+          start{start + sizeof(uint64_t)},
+          space{remaining_space},
+          len{0} {}
+
+    inline void fast_store(uint64_t const x, uint64_t const y, uint8_t* buf,
+                           size_t buf_len) {
+      auto temp = start;
+
+      *reinterpret_cast<uint64_t*>(start) = x;
+      start += sizeof(x);
+
+      *reinterpret_cast<uint64_t*>(start) = y;
+      start += sizeof(y);
+
+      memcpy(start, buf, buf_len);
+      start += buf_len;
+
+      len += start - temp;
+    }
+
+    inline void store_uint64(uint64_t const& x) {
+      if (len + sizeof(x) > space) {
+        throw std::runtime_error("Log ran out of space. Entry cannot fit.");
+      }
+
+      *reinterpret_cast<uint64_t*>(start) = x;
+      start += sizeof(x);
+      len += sizeof(x);
+    }
+
+    inline void store_buf(const void* buf, size_t length) {
+      if (len + length > space) {
+        throw std::runtime_error("Log ran out of space. Entry cannot fit.");
+      }
+
+      memcpy(start, buf, length);
+      start += length;
+      len += length;
+    }
+
+    inline size_t finalize() {
+      auto length = reinterpret_cast<uint64_t*>(start - len - sizeof(uint64_t));
+      *length = len;
+      *start = 0xff;
+
+      // The +1 is for the canary value, the uint64_t is because we encode the
+      // the length.
+      return *length + 1 + sizeof(uint64_t);
+    }
+
+    inline uint8_t* basePtr() const { return base; }
+
+    inline size_t length() const { return len + 1 + sizeof(uint64_t); }
+
+   private:
+    uint8_t* base;
+    uint8_t* start;
+    uint64_t space;
+    uint64_t len;
+  };
+
   struct LogHeader {
     uint64_t min_proposal;
     uint64_t first_undecided_offset;
@@ -173,6 +241,9 @@ class Log {
 
   Entry newEntry();
   void finalizeEntry(Entry& entry);
+
+  CallEntry newCallEntry(uint64_t offset);
+  void finalizeCallEntry(CallEntry& call);
 
   inline uint64_t headerProposalAddress() volatile {
     uint64_t volatile* prop = &(header->min_proposal);
@@ -326,4 +397,56 @@ class Slot {
   Log::Entry entry;
   int seq;
 };
+
+
+class Call {
+ public:
+  Call(Log& log, uint64_t log_offset) : log{log}, log_offset{log_offset}, seq{0} { call = log.newCallEntry(log_offset); }
+
+  Call(Log& log, uint64_t log_offset, uint64_t fuo, uint8_t* buf, size_t buf_len)
+      : log{log}, log_offset{log_offset}  {
+    call = log.newCallEntry(log_offset);
+    call.fast_store(1, fuo, buf, buf_len);
+    log.finalizeCallEntry(call);
+  }
+
+  inline void storeAcceptedProposal(uint64_t proposal) {
+    check_sequence(0);
+    call.store_uint64(proposal);
+  }
+
+  inline void storeFirstUndecidedOffset(uint64_t fuo) {
+    check_sequence(1);
+    call.store_uint64(fuo);
+  }
+
+  inline void storePayload(const uint8_t* buf, size_t len) {
+    check_sequence(2);
+    call.store_buf(buf, len);
+    log.finalizeCallEntry(call);
+  }
+
+  inline ParsedSlot toParsedSlot() const { return ParsedSlot(call.basePtr()); }
+
+  std::tuple<uint8_t*, ptrdiff_t, size_t> location() const {
+    return std::make_tuple(call.basePtr(), call.basePtr() - log.headerPtr(),
+                           call.length());
+  }
+
+ private:
+  inline void check_sequence(int x) {
+    if (x != seq) {
+      throw std::runtime_error(
+          "Slot construction does not follow the proper order");
+    }
+    seq += 1;
+  }
+
+ private:
+  Log& log;
+  uint64_t log_offset;
+  Log::CallEntry call;
+  int seq;
+};
+
 }  // namespace dory

@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "atomicops.h"
+#include <dory/shared/atomicops.h>
+
 #include <new>
 #include <type_traits>
 #include <utility>

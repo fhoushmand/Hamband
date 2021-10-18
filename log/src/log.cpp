@@ -49,10 +49,8 @@ static bool is_zero(uint8_t *buf, size_t size) {
 
 Log::Log(void *underlying_buf, size_t buf_len)
     : buf{reinterpret_cast<uint8_t *>(underlying_buf)}, len{buf_len} {
-      std::cout << "before\n";
   static_assert(LogConfig::is_powerof2(LogConfig::Alignment),
                 "should use a power of 2 as template parameter");
-                std::cout << "after\n";
 
   auto buf_addr = reinterpret_cast<uintptr_t>(underlying_buf);
 
@@ -61,8 +59,8 @@ Log::Log(void *underlying_buf, size_t buf_len)
   }
 
   auto offset = LogConfig::round_up_powerof2(buf_addr) - buf_addr;
-  std::cout << "Rounding up: " << round_up_powerof2(buf_addr) << " " <<
-  buf_addr << std::endl;
+  // std::cout << "Rounding up: " << LogConfig::round_up_powerof2(buf_addr) << " " <<
+  // buf_addr << std::endl;
   if (offset > len) {
     throw std::runtime_error(
         "Alignment constraint leaves no space in the buffer");
@@ -100,8 +98,19 @@ Log::Entry Log::newEntry() {
   return Entry(buf + len - header->free_bytes, header->free_bytes);
 }
 
+Log::CallEntry Log::newCallEntry(uint64_t offset) {
+  // std::cout << "Adding entry with absolute offset " << len -
+  // header->free_bytes << std::endl;
+  return CallEntry(offset + buf + len - header->free_bytes, header->free_bytes);
+}
+
 void Log::finalizeEntry(Entry &entry) {
   auto bytes_used = entry.finalize();
+  header->free_bytes -= LogConfig::round_up_powerof2(bytes_used);
+}
+
+void Log::finalizeCallEntry(CallEntry &call) {
+  auto bytes_used = call.finalize();
   header->free_bytes -= LogConfig::round_up_powerof2(bytes_used);
 }
 
