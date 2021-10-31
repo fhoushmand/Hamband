@@ -20,7 +20,7 @@ RdmaConsensus::RdmaConsensus(int my_id, std::vector<int>& remote_ids,
       LOGGER_INIT(logger, ConsensusConfig::logger_prefix) {
   using namespace units;
 
-  allocated_size = 1_GiB;
+  allocated_size = 2_GiB;
   alignment = 64;
 
   run();

@@ -7,6 +7,9 @@
 #SBATCH --mem=15G
 #SBATCH -p short # This is the default partition, you can use any of the following; intel, batch, highmem, gpue
 #SBATCH --exclusive
+#SBATCH --constraint="intel"
+
+module load valgrind;
 
 nodes=($( scontrol show hostnames $SLURM_NODELIST ))
 nnodes=${#nodes[@]}
@@ -27,7 +30,7 @@ ssh ${nodes[0]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; memcached -vv -p 9999'&
 sleep 5;
 for i in $( seq 1 $last ); do
         #printf "ssh ${nodes[$i]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./crash-consensus/demo/using_conan_fully/build/bin/main-st $i 4096 1 > $i.log'"
-        ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./build/bin/dorydemo $i > $i.log &"
+        ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./build/bin/dorydemo $i > $i.log &"
 done
 
 sleep 60

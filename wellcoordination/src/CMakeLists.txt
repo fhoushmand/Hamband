@@ -1,5 +1,5 @@
 cmake_minimum_required( VERSION 3.9 )
-project( dorydemo CXX )
+project( hamsaz CXX )
 
 include( CheckIPOSupported )
 check_ipo_supported(RESULT supported OUTPUT error)
@@ -26,9 +26,9 @@ MESSAGE( STATUS "CMAKE_BUILD_TYPE: " ${CMAKE_BUILD_TYPE} )
 MESSAGE( STATUS "CMAKE_INTERPROCEDURAL_OPTIMIZATION: " ${CMAKE_INTERPROCEDURAL_OPTIMIZATION} )
 
 add_executable(
-    dorydemo 
+    hamsaz
     main.cpp
-    main_copy.cpp
+    test.cpp
 )
 
-target_link_libraries(dorydemo ${CONAN_LIBS} pthread)
+target_link_libraries(hamsaz ${CONAN_LIBS} pthread)

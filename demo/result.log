@@ -1,4 +1,4 @@
-i04 i06 i07 i08
+i04 i05 i06 i07
 slab class   1: chunk size        96 perslab   10922
 slab class   2: chunk size       120 perslab    8738
 slab class   3: chunk size       152 perslab    6898
@@ -47,103 +47,9 @@ slab class  42: chunk size   1048576 perslab       1
 <29 send buffer was 212992, now 268435456
 <28 server listening (udp)
 <28 server listening (udp)
-<29 server listening (udp)
 <28 server listening (udp)
 <28 server listening (udp)
 <29 server listening (udp)
 <29 server listening (udp)
 <29 server listening (udp)
-<30 new auto-negotiating client connection
-30: Client using the ascii protocol
-<30 set qp-1-for-2 0 0 39
->30 STORED
-<30 set qp-1-for-3 0 0 39
->30 STORED
-<30 set qp-1-ready(announce) 0 0 15
->30 STORED
-<30 get qp-1-ready(announce)
->30 sending key qp-1-ready(announce)
->30 END
-<30 get qp-2-ready(announce)
->30 END
-<31 new auto-negotiating client connection
-31: Client using the ascii protocol
-<31 set qp-2-for-1 0 0 39
->31 STORED
-<31 set qp-2-for-3 0 0 39
->31 STORED
-<31 set qp-2-ready(announce) 0 0 15
->31 STORED
-<31 get qp-2-ready(announce)
->31 sending key qp-2-ready(announce)
->31 END
-<31 get qp-1-ready(announce)
->31 sending key qp-1-ready(announce)
->31 END
-<31 get qp-3-ready(announce)
->31 END
-<32 new auto-negotiating client connection
-32: Client using the ascii protocol
-<32 set qp-3-for-1 0 0 39
->32 STORED
-<32 set qp-3-for-2 0 0 39
->32 STORED
-<32 set qp-3-ready(announce) 0 0 15
->32 STORED
-<32 get qp-3-ready(announce)
->32 sending key qp-3-ready(announce)
->32 END
-<32 get qp-1-ready(announce)
->32 sending key qp-1-ready(announce)
->32 END
-<32 get qp-2-ready(announce)
->32 sending key qp-2-ready(announce)
->32 END
-<30 get qp-2-ready(announce)
->30 sending key qp-2-ready(announce)
->30 END
-<30 get qp-3-ready(announce)
->30 sending key qp-3-ready(announce)
->30 END
-<31 get qp-3-ready(announce)
->31 sending key qp-3-ready(announce)
->31 END
-<32 get qp-1-for-3
->32 sending key qp-1-for-3
->32 END
-<32 get qp-2-for-3
->32 sending key qp-2-for-3
->32 END
-<32 set qp-3-ready(connect) 0 0 14
->32 STORED
-<32 get qp-3-ready(connect)
->32 sending key qp-3-ready(connect)
->32 END
-<30 get qp-2-for-1
->30 sending key qp-2-for-1
->30 END
-<30 get qp-3-for-1
->30 sending key qp-3-for-1
->30 END
-<30 set qp-1-ready(connect) 0 0 14
->30 STORED
-<30 get qp-1-ready(connect)
->30 sending key qp-1-ready(connect)
->30 END
-<31 get qp-1-for-2
->31 sending key qp-1-for-2
->31 END
-<31 get qp-3-for-2
->31 sending key qp-3-for-2
->31 END
-<31 set qp-2-ready(connect) 0 0 14
->31 STORED
-<31 get qp-2-ready(connect)
->31 sending key qp-2-ready(connect)
->31 END
-<32 quit
-<32 connection closed.
-<30 quit
-<30 connection closed.
-<31 quit
-<31 connection closed.
+<29 server listening (udp)

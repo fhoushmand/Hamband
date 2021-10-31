@@ -5,6 +5,35 @@
 
 using namespace std;
 
+
+namespace dory {
+PartitionedIterator::PartitionedIterator(uint8_t* base_ptr, ptrdiff_t part_length, size_t num_partition) {
+        this->base_ptr = base_ptr;
+        this->part_length = part_length;
+        this->num_partitions = num_partition;
+        entry_ptrs.resize(num_partitions);
+        for(size_t i = 0; i < num_partition; i++){
+          entry_ptrs[i] = base_ptr + (i * part_length);
+        }
+        
+        
+      }
+
+void PartitionedIterator::reset(size_t partition) {
+  // for(size_t i = 0; i < part_offsets.size(); i++)
+  entry_ptrs[partition] = base_ptr + (partition * part_length);
+}
+
+PartitionedIterator& PartitionedIterator::next(size_t partition) {
+  auto length = *reinterpret_cast<uint64_t*>(entry_ptrs[partition]);
+  auto canary = entry_ptrs[partition] + length + sizeof(uint64_t);
+  while (*canary == 0);
+  entry_ptrs[partition] += dory::LogConfig::round_up_powerof2(canary + 1 - entry_ptrs[partition]);
+
+  return *this;
+}
+}  // namespace dory
+
 namespace dory {
 SnapshotIterator::SnapshotIterator(uint8_t* entry_ptr, size_t length)
     : entry_ptr{entry_ptr}, end_ptr{entry_ptr + length} {}
@@ -25,7 +54,12 @@ SnapshotIterator& SnapshotIterator::next() {
 
 namespace dory {
 BlockingIterator::BlockingIterator(uint8_t* entry_ptr)
-    : entry_ptr{entry_ptr}, increment{0} {}
+    : saved_entry_ptr{entry_ptr}, entry_ptr{entry_ptr}, increment{0} {}
+
+void BlockingIterator::reset() { 
+  entry_ptr = saved_entry_ptr;
+  increment = 0; 
+}
 
 BlockingIterator& BlockingIterator::next() {
   entry_ptr += increment;
@@ -47,17 +81,20 @@ BlockingIterator& BlockingIterator::next() {
 bool BlockingIterator::sampleNext() {
   auto tmp_entry_ptr = entry_ptr + increment;
 
+  // check for the length of the entry which is the first uint64_t 
   volatile auto length_ptr = reinterpret_cast<uint64_t*>(tmp_entry_ptr);
   if (*length_ptr == 0) {
     return false;
   }
 
+  // checks if the canary bit has been set
   volatile auto canary_ptr = tmp_entry_ptr + *length_ptr + sizeof(uint64_t);
   if (*canary_ptr == 0) {
     return false;
   }
 
   entry_ptr = tmp_entry_ptr;
+  // finds the nearest power of 2 of the entry length. (entry length is calculated as: canary_ptr + 1 - entry_ptr)
   increment = LogConfig::round_up_powerof2(canary_ptr + 1 - entry_ptr);
   return true;
 }
@@ -66,6 +103,8 @@ bool BlockingIterator::sampleNext() {
 namespace dory {
 LiveIterator::LiveIterator(uint8_t* base_ptr, uint8_t* entry_ptr)
     : base_ptr{base_ptr}, entry_ptr{entry_ptr}, increment{0} {}
+
+void LiveIterator::reset() { increment = 0; }
 
 bool LiveIterator::hasNext(ptrdiff_t limit) {
   entry_ptr += increment;

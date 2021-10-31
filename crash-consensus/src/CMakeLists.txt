@@ -25,10 +25,6 @@ MESSAGE( STATUS "CMAKE_INTERPROCEDURAL_OPTIMIZATION: " ${CMAKE_INTERPROCEDURAL_O
 
 add_library(
     dorycrashconsensus
-    #memory.cpp
-    #log/log-iterators.cpp
-    #log/log.cpp
-
     contexted-poller.cpp
     response-tracker.cpp
     quorum-waiter.cpp

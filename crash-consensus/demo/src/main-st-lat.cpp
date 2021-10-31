@@ -13,7 +13,6 @@
 #include <condition_variable>
 
 #include "helpers.hpp"
-#include "timers.h"
 
 void benchmark(int id, std::vector<int> remote_ids, int times, int payload_size,
                int outstanding_req, dory::ThreadBank threadBank);

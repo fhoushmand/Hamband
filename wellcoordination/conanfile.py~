@@ -2,11 +2,11 @@ from conans import ConanFile, CMake
 
 
 class DoryDemoConan(ConanFile):
-    name = "dory-demo"
+    name = "hamsaz"
     version = "0.0.1"
     license = "MIT"
     # url = "TODO"
-    description = "RDMA demo"
+    description = "Hamsaz RDMA"
     settings = {
         "os": None,
         "compiler": {
@@ -44,6 +44,8 @@ class DoryDemoConan(ConanFile):
         self.requires("dory-external/0.0.1")
         self.requires("dory-log/0.0.1")
         self.requires("dory-memory/0.0.1")
+        self.requires("dory-crash-consensus/0.0.1")
+        
 
     def build(self):
         generator = self.python_requires["dory-compiler-options"].module.generator()

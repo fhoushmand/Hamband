@@ -9,6 +9,8 @@
 #SBATCH --exclusive
 #SBATCH --constraint="intel"
 
+module load valgrind;
+
 nodes=($( scontrol show hostnames $SLURM_NODELIST ))
 nnodes=${#nodes[@]}
 last=$(( $nnodes - 1 ))

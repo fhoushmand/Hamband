@@ -83,7 +83,6 @@ class LogSlotReader {
     do {
       ptrdiff_t offset;
       uint32_t size;
-      std::cout << "inside while\n" << std::endl;
       if (!to_be_polled.postList().empty()) {
         for (auto &pid : to_be_polled.postList()) {
           auto &rc = rcs.find(pid)->second;

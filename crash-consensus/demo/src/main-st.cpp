@@ -14,6 +14,9 @@
 #include "helpers.hpp"
 #include "timers.h"
 
+uint64_t sum = 0;
+uint64_t start = 0;
+
 void benchmark(int id, std::vector<int> remote_ids, int times, int payload_size,
                int outstanding_req, dory::ThreadBank threadBank);
 
@@ -72,7 +75,11 @@ void benchmark(int id, std::vector<int> remote_ids, int times, int payload_size,
   dory::Consensus consensus(id, remote_ids, outstanding_req, threadBank);
   consensus.commitHandler([]([[maybe_unused]] bool leader,
                              [[maybe_unused]] uint8_t* buf,
-                             [[maybe_unused]] size_t len) {});
+                             [[maybe_unused]] size_t len) {
+                               auto end = std::chrono::duration_cast<std::chrono::microseconds>(
+                   std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+                                sum += end-start;
+                             });
 
   // Wait enough time for the consensus to become ready
   std::cout << "Wait some time" << std::endl;
@@ -90,7 +97,7 @@ void benchmark(int id, std::vector<int> remote_ids, int times, int payload_size,
     TIMESTAMP_T loop_time;
 
     mkrndstr_ipa(payload_size, payload);
-    // consensus.propose(payload, payload_size);
+    consensus.propose(payload, payload_size);
 
     int offset = 2;
 
@@ -104,8 +111,10 @@ void benchmark(int id, std::vector<int> remote_ids, int times, int payload_size,
 
     TIMESTAMP_T start_meas, end_meas;
 
+    start = std::chrono::duration_cast<std::chrono::microseconds>(
+                   std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     GET_TIMESTAMP(start_meas);
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < times; i++) {
       // GET_TIMESTAMP(timestamps_start[i]);
       // Encode process doing the proposal
       dory::ProposeError err;
@@ -146,8 +155,11 @@ void benchmark(int id, std::vector<int> remote_ids, int times, int payload_size,
       }
     }
     GET_TIMESTAMP(end_meas);
-    std::cout << "Replicated " << times << " commands of size " << payload_size << " bytes in "
-              << ELAPSED_NSEC(start_meas, end_meas) << " ns" << std::endl;
+    std::cout << "Replicated " << times << " commands of size " << payload_size
+              << " bytes in " << ELAPSED_NSEC(start_meas, end_meas) << " ns"
+              << std::endl;
+    std::cout << "my sum response time " << sum/times << std::endl;
+    
 
     exit(0);
   }

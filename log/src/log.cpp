@@ -72,6 +72,8 @@ Log::Log(void *underlying_buf, size_t buf_len)
   len -= offset;
 
   header = reinterpret_cast<LogHeader *>(buf);
+
+  // header stores the following digest information about the state of the log:
   header->min_proposal = 0;
   header->first_undecided_offset = 0;
   header->free_bytes = len - LogConfig::round_up_powerof2(sizeof(LogHeader));
@@ -98,23 +100,67 @@ Log::Entry Log::newEntry() {
   return Entry(buf + len - header->free_bytes, header->free_bytes);
 }
 
-Log::CallEntry Log::newCallEntry(uint64_t offset) {
-  // std::cout << "Adding entry with absolute offset " << len -
-  // header->free_bytes << std::endl;
-  return CallEntry(offset + buf + len - header->free_bytes, header->free_bytes);
-}
-
 void Log::finalizeEntry(Entry &entry) {
   auto bytes_used = entry.finalize();
   header->free_bytes -= LogConfig::round_up_powerof2(bytes_used);
 }
 
-void Log::finalizeCallEntry(CallEntry &call) {
-  auto bytes_used = call.finalize();
-  header->free_bytes -= LogConfig::round_up_powerof2(bytes_used);
+std::vector<uint8_t> Log::dump() const {
+  std::vector<uint8_t> v;
+
+  for (size_t i = 0; i < len; i++) {
+    v.push_back(buf[i]);
+  }
+
+  return v;
 }
 
-std::vector<uint8_t> Log::dump() const {
+
+
+
+// Log for non-conflicting operations added by FARZIN
+
+HamsazLog::HamsazLog(void *underlying_buf, size_t buf_len, size_t num_partitions)
+    : buf{reinterpret_cast<uint8_t *>(underlying_buf)}, len{buf_len}, num_partitions{num_partitions} {
+  static_assert(LogConfig::is_powerof2(LogConfig::Alignment),
+                "should use a power of 2 as template parameter");
+
+  auto buf_addr = reinterpret_cast<uintptr_t>(underlying_buf);
+
+  if (!is_zero(buf, buf_len)) {
+    throw std::runtime_error("Provided buffer is not zeroed out");
+  }
+
+  auto offset = LogConfig::round_up_powerof2(buf_addr) - buf_addr;
+  // std::cout << "Rounding up: " << LogConfig::round_up_powerof2(buf_addr) << " " <<
+  // buf_addr << std::endl;
+  if (offset > len) {
+    throw std::runtime_error(
+        "Alignment constraint leaves no space in the buffer");
+  }
+
+
+  buf += offset;
+  len -= offset;
+  free_bytes = len;
+}
+
+
+HamsazLog::CallEntry HamsazLog::newCallEntry(uint64_t offset, bool override) {
+  // std::cout << "Adding entry with absolute offset " << len -
+  // header->free_bytes << std::endl;
+  if(override)
+    return CallEntry(offset + buf, free_bytes);
+  else
+    return CallEntry(offset + buf + len - free_bytes, free_bytes);
+}
+
+void HamsazLog::finalizeCallEntry(CallEntry &call) {
+  auto bytes_used = call.finalize();
+  free_bytes -= LogConfig::round_up_powerof2(bytes_used);
+}
+
+std::vector<uint8_t> HamsazLog::dump() const {
   std::vector<uint8_t> v;
 
   for (size_t i = 0; i < len; i++) {

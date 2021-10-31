@@ -3,8 +3,31 @@
 #include <cstddef>
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 #include "log-helpers.hpp"
+
+namespace dory{
+class PartitionedIterator {
+ public:
+  PartitionedIterator() {}
+  PartitionedIterator(uint8_t* base_ptr, ptrdiff_t part_length, size_t num_partitions);
+  void reset(size_t partition);
+  inline bool hasNext(size_t partition) { 
+    return entry_ptrs[partition] < (base_ptr + ((partition + 1) * part_length)); 
+  }
+  PartitionedIterator& next(size_t partition);
+
+  inline uint8_t* location(size_t partition) { return entry_ptrs[partition]; }
+
+ private:
+  uint8_t* base_ptr;
+  ptrdiff_t part_length;
+  size_t num_partitions;
+  std::vector<uint8_t*> entry_ptrs;
+};
+
+}
 
 namespace dory {
 class SnapshotIterator {
@@ -28,12 +51,14 @@ class BlockingIterator {
   BlockingIterator() {}
   BlockingIterator(uint8_t* entry_ptr);
 
+  void reset();
   BlockingIterator& next();
   bool sampleNext();
 
   inline uint8_t* location() { return entry_ptr; }
 
  private:
+  uint8_t* saved_entry_ptr;
   uint8_t* entry_ptr;
   ptrdiff_t increment;
 };
@@ -45,6 +70,8 @@ class LiveIterator {
   LiveIterator() {}
   LiveIterator(uint8_t* base_ptr, uint8_t* entry_ptr);
 
+  void reset();
+
   bool hasNext(ptrdiff_t limit);
 
   LiveIterator& next(bool check = false);
@@ -52,6 +79,7 @@ class LiveIterator {
   inline uint8_t* location() { return entry_ptr; }
 
  private:
+  uint8_t* saved_entry_ptr;
   uint8_t* base_ptr;
   uint8_t* entry_ptr;
   ptrdiff_t increment;
