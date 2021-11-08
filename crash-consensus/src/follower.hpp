@@ -101,6 +101,7 @@ class Follower {
 
  private:
   void run() {
+    std::cout << "started follower thread" << std::endl;
     int loops = 0;
     constexpr unsigned mask = (1 << 14) - 1;  // Must be power of 2 minus 1
 
@@ -122,7 +123,7 @@ class Follower {
           log_mutex.lock();
         }
       }
-
+      std::cout << "checking queue" << std::endl;
       auto has_next = iter->sampleNext();
       if (!has_next) {
         continue;

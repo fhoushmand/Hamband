@@ -86,7 +86,8 @@ class ReliableConnection {
 
   enum RdmaReq { RdmaRead = IBV_WR_RDMA_READ, RdmaWrite = IBV_WR_RDMA_WRITE };
 
-  static constexpr int WRDepth = 1280;
+  // added a zero here
+  static constexpr int WRDepth = 12800;
   static constexpr int SGEDepth = 16;
   static constexpr int MaxInlining = 256;
   static constexpr uint32_t DefaultPSN = 3185;

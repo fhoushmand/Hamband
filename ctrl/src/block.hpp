@@ -35,7 +35,8 @@ class ControlBlock {
     uint32_t rkey;
   };
 
-  static constexpr int CQDepth = 128;
+  // initially it was 128
+  static constexpr int CQDepth = 4096;
 
   ControlBlock(ResolvedPort &resolved_port);
 

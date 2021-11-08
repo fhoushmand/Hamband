@@ -109,3 +109,36 @@
 //   std::cout << "end\n";
 //   return 0;
 // }
+#include "courseware.hpp"
+
+// int main(int argc, char* argv[]) {
+//     Courseware cw = Courseware();
+//     MethodCallFactory factory = MethodCallFactory(cw, 4);
+
+//     int** vs = new int*[2];
+//     int vs0[4] = {1,2,3,4};
+//     int vs1[4] = {10,20,30,40};
+//     vs[0] = vs0;
+//     vs[1] = vs1;
+//     std::string line;
+//     std::getline(std::cin, line);
+//     int id = 0;
+//     std::string seq = std::to_string(1) + "-" + std::to_string(id++);
+//     MethodCall call = factory.createCall(seq, line);
+//     call.attachDependencies(vs);
+//     factory.toString(call);
+
+//     std::vector<uint8_t> buffer;
+//     buffer.resize(256);
+//     uint8_t* b = &buffer[0];
+
+//     auto length = factory.serialize(call, b);
+//     buffer.resize(length);
+
+//     MethodCall c = factory.deserialize(b);
+//     factory.toString(c);
+
+
+
+
+// }

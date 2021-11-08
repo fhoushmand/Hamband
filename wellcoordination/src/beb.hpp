@@ -17,6 +17,7 @@
 
 #include <dory/log/context.hpp>
 #include <dory/mem/memory.hpp>
+#include <atomic>
 
 #include "logger.hpp"
 
@@ -41,6 +42,7 @@ class BE_Broadcast {
 
  public:
   int self;
+  std::atomic<int> num_writes = 0;
   size_t num_process;
   std::vector<int> remote_ids;
   std::vector<int> ids;
@@ -59,6 +61,8 @@ class BE_Broadcast {
                             int* deps, bool override);
 
   bool pollCQ();
+
+  bool consume(std::vector<struct ibv_wc>& entries);
   
   
 };
@@ -137,7 +141,7 @@ bool BE_Broadcast::broadcastCall(uint8_t* payload, size_t len,
                                  bool override = false) {
   // second argument indicates the offset for the corresponding log of this
   // process in the remote hosts
-  Call call(*(log.get()), remote_offsets[self - 1], deps, payload, len,
+  Call call(*(log.get()), remote_offsets[self - 1], payload, len,
             override);
   auto [address, offset, size] = call.location();
   for (auto& c : ce->connections()) {
@@ -186,10 +190,46 @@ bool BE_Broadcast::broadcastCallNoDep(uint8_t* payload, size_t len,
   return broadcastCall(payload, len, seq_number, NULL, override);
 }
 
+bool BE_Broadcast::consume(std::vector<struct ibv_wc>& entries) {
+  auto ret = true;
+  for (auto const& entry : entries) {
+    if (entry.status != IBV_WC_SUCCESS) {
+      std::cout << "write not successfull" << std::endl;
+      ret = false;
+    } else {
+      num_writes++;
+      auto [k, pid, seq] = quorum::unpackAll<int64_t, int64_t>(entry.wr_id);
+
+      // if (k != kind) {
+      //   std::cout << "Mismatched message kind: (" << quorum::type_str(k)
+      //             << " vs " << quorum::type_str(kind)
+      //             << "). Received unexpected/old message response from the "
+      //                "completion queue"
+      //             << std::endl;
+      //   continue;
+      // }
+
+      // auto current_seq = scoreboard[pid];
+      // scoreboard[pid] = next_id - current_seq == modulo ? seq : 0;
+
+      // if (scoreboard[pid] == next_id) {
+      //   left -= 1;
+      // }
+
+      // if (left == 0) {
+      //   left = quorum_size;
+      //   next_id += modulo;
+      // }
+    }
+  }
+  return ret;
+}
+
 bool BE_Broadcast::pollCQ()
 {
-  entries.resize(remote_ids.size());
-  return cb->pollCqIsOK(cb->cq("hamsaz-cq"), entries);
+  entries.resize(remote_ids.size()*10);
+  cb->pollCqIsOK(cb->cq("hamsaz-cq"), entries);
+  return consume(entries);
 }
 
 }  // namespace hamsaz

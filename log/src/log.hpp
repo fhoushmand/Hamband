@@ -70,43 +70,17 @@ class ParsedCall {
   ParsedCall() {}
   ParsedCall(uint8_t* ptr) : ptr{ptr} {}
 
-  inline int* dependencies() {
-    return reinterpret_cast<int*>(ptr + offsets[2]);
-  }
-
-  inline bool hasDeps() {
-    return *reinterpret_cast<int*>(ptr + offsets[1]);
-  }
-
-  inline void setDependencies(int* deps) {
-
-    int* first = deps;
-    int* last = deps + 4;
-    int* d_first = reinterpret_cast<int*>(ptr + offsets[1]);
-
-    while (first != last) {
-        *d_first++ = *first++;
-    }
-  }
-
   inline std::pair<uint8_t*, size_t> payload() {
-    if(hasDeps()){
-      auto length = *reinterpret_cast<uint64_t*>(ptr + offsets[0]) - 4 * sizeof(int);
-      auto buf = ptr + offsets[2] + (4 * sizeof(int));  
-      return std::make_pair(buf, length);
-    }
-    else{
-      auto length = *reinterpret_cast<uint64_t*>(ptr + offsets[0]) - sizeof(int);
-      auto buf = ptr + offsets[2];
-      return std::make_pair(buf, length);
-    }
+    auto length = *reinterpret_cast<uint64_t*>(ptr + offsets[0]);
+    auto buf = ptr + offsets[1];
+    return std::make_pair(buf, length);
   }
 
   inline bool isPopulated() { return *reinterpret_cast<uint64_t*>(ptr) > 0; }
 
-  // inline size_t totalLength() {
-  //   return *reinterpret_cast<uint64_t*>(ptr) + sizeof(uint64_t) + 1;
-  // }
+  inline size_t totalLength() {
+    return *reinterpret_cast<uint64_t*>(ptr) + sizeof(uint64_t) + 1;
+  }
 
   // static inline size_t copy(uint8_t* dst, uint8_t* src) {
   //   auto src_len = *reinterpret_cast<uint64_t*>(src);
@@ -120,9 +94,8 @@ class ParsedCall {
 
  private:
   static constexpr const int offsets[] = {
-      0,   // For the length of the entry,
-      8,   // Flag for deps,
-      12  // Deps/buffer,
+      0,  // For the length of the entry,
+      8   // Buffer,
   };
 
   uint8_t* ptr;
@@ -150,37 +123,6 @@ class HamsazLog {
       memcpy(start, buf, length);
       start += length;
       len += length;
-    }
-
-    inline void indicate_no_deps() {
-      // indicates dependency exists
-      *reinterpret_cast<int*>(start) = 0;
-      start += sizeof(int);
-      len += sizeof(int);
-    }
-
-    inline void store_deps(const int* deps, size_t length = 4) {
-      if (len + length > space) {
-        throw std::runtime_error("Log ran out of space. Entry cannot fit.");
-      }
-      // indicates dependency exists
-      *reinterpret_cast<int*>(start) = 1;
-      start += sizeof(int);
-      len += sizeof(int);
-
-      // actual deps counters
-      for(size_t i = 0; i < length; i++)
-      {
-        *reinterpret_cast<int*>(start) = deps[i];
-        start += sizeof(int);
-        len += sizeof(int);
-      }
-      // *reinterpret_cast<int*>(start) = deps[1];
-      // start += sizeof(int);
-      // len += sizeof(int);
-      // *reinterpret_cast<int*>(start) = deps[2];
-      // start += sizeof(int);
-      // len += sizeof(int);
     }
 
     inline size_t finalize() {
@@ -611,31 +553,10 @@ class Slot {
 
 class Call {
  public:
-  Call(HamsazLog& log, uint64_t log_offset, int* deps, uint8_t* buf, size_t buf_len, bool override)
+  Call(HamsazLog& log, uint64_t log_offset, uint8_t* buf, size_t buf_len, bool override)
       : log{log}, log_offset{log_offset}  {
     call = log.newCallEntry(log_offset, override);
-    // no dependency condition
-    // std::cout << "dep size " << sizeof(deps)/sizeof(deps[0]) << std::endl;
-    // std::cout << "dep zero " << deps[0] << std::endl;
-    
-    if(deps == NULL){
-      call.indicate_no_deps();
-      // std::cout << "no dp" << std::endl;
-    }
-    else
-      call.store_deps(deps);
     call.store_buf(buf, buf_len);
-    log.finalizeCallEntry(call);
-  }
-
-  // inline void storeDependencies(int* deps) {
-  //   // check_sequence(0);
-  //   call.store_deps(deps);
-  // }
-
-  inline void storePayload(const uint8_t* buf, size_t len) {
-    // check_sequence(2);
-    call.store_buf(buf, len);
     log.finalizeCallEntry(call);
   }
 

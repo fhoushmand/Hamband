@@ -304,7 +304,7 @@ bool ReliableConnection::postSendSingleCached(RdmaReq req, uint64_t req_id,
 
   if (wr_cached->opcode == IBV_WR_RDMA_WRITE && len <= MaxInlining) {
     wr_cached->send_flags |= IBV_SEND_INLINE;
-    // wr_cached->send_flags |= IBV_SEND_FENCE;
+    wr_cached->send_flags |= IBV_SEND_FENCE;
   } else {
     wr_cached->send_flags &= ~static_cast<unsigned int>(IBV_SEND_INLINE);
   }
