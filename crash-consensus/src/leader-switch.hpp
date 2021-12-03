@@ -44,6 +44,8 @@ class LeaderHeartbeat {
     // Careful, there is a move assignment happening!
   }
 
+  std::atomic<int> start_id;
+
   void startPoller() {
     read_seq = 0;
 
@@ -202,7 +204,7 @@ class LeaderHeartbeat {
     //   std::cout << std::endl;
     // }
 
-    if (leader_pid() == ctx->cc.my_id) {
+    if (leader_pid(start_id.load()) == ctx->cc.my_id) {
       want_leader.store(true);
     } else {
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -242,13 +244,15 @@ class LeaderHeartbeat {
   };
 
  private:
-  int leader_pid() {
+  int leader_pid(int start_index) {
     int leader_id = -1;
 
-    for (auto &pid : ids) {
+    for (int i = 0; i < static_cast<int>(ids.size()); i++) {
+      int pid = ids[i];
       // std::cout << pid << " " << status[pid].consecutive_updates <<
       // std::endl;
       if (status[pid].consecutive_updates > 2) {
+        // leader_id = pid;
         leader_id = pid;
         break;
       }
@@ -533,7 +537,10 @@ class LeaderSwitcher {
         want_leader{&heartbeat->wantLeaderSignal()},
         read_slots{ctx->scratchpad.writeLeaderChangeSlots()},
         sz{read_slots.size()},
+        // leader_start_index{(heartbeat->start_id == 0 ? 0 : heartbeat->start_id + 1)},
         permission_asker{ctx} {
+    leader_start_index.store((heartbeat->start_id.load() == 0 ? 0 : heartbeat->start_id.load() + 1));
+    std::cout << "inside leaderswitcher constructor: " << leader_start_index << std::endl;
     prepareScanner();
   }
 
@@ -545,7 +552,7 @@ class LeaderSwitcher {
     int force_reset = 0;
     auto constexpr shift = 8 * sizeof(uintptr_t) - 1;
 
-    for (int i = 0; i < static_cast<int>(sz); i++) {
+    for (int i = leader_start_index.load(); i < static_cast<int>(sz); i++) {
       reading[i] = *reinterpret_cast<uint64_t *>(read_slots[i]);
       force_reset = static_cast<int>(reading[i] >> shift);
       reading[i] &= (1UL << shift) - 1;
@@ -556,12 +563,12 @@ class LeaderSwitcher {
         break;
       }
     }
-
     // If you discovered a new request for a leader, notify the main event loop
     // to give permissions to him and switch to follower.
     if (requester > 0) {
-      // std::cout << "Process with pid " << requester
-      //           << " asked for permissions" << std::endl;
+      std::cout << "index: " << leader_start_index.load() << std::endl;
+      std::cout << "Process with pid " << requester
+                << " asked for permissions" << std::endl;
       leader.store(dory::Leader(requester, reading[requester], force_reset));
       want_leader->store(false);
     } else {
@@ -594,10 +601,10 @@ class LeaderSwitcher {
     Leader current_leader = leader.load();
     if (current_leader != prev_leader || force_permission_request) {
       // std::cout << "Adjusting connections to leader ("
-      //           << int(current_leader.requester) << " "
-      //           << current_leader.requester_value << ") " << (current_leader
-      //           != prev_leader) << " " << force_permission_request <<
-      //           std::endl;
+                // << int(current_leader.requester) << " "
+                // << current_leader.requester_value << ") " << (current_leader
+                // != prev_leader) << " " << force_permission_request <<
+                // std::endl;
 
       auto orig_leader = prev_leader;
       prev_leader = current_leader;
@@ -611,13 +618,13 @@ class LeaderSwitcher {
 
           // GET_TIMESTAMP(ts_start);
 
-          // std::cout << "Asking for permissions: " << hard_reset << std::endl;
+          std::cout << "Asking for permissions: " << hard_reset << std::endl;
           // Ask for permission. Wait for everybody to reply
           permission_asker.askForPermissions(hard_reset);
 
           // GET_TIMESTAMP(ts_mid);
 
-          // std::cout << "Waiting for approval" << std::endl;
+          std::cout << "Waiting for approval" << std::endl;
           // In order to avoid a distributed deadlock (when two processes try
           // to become leaders at the same time), we bail whe the leader
           // changes.
@@ -643,7 +650,7 @@ class LeaderSwitcher {
           // std::cout << "Asking for permissions: " << hard_reset << std::endl;
 
           // std::cout << "I (process " << c_ctx->my_id << ") got leader "
-          //           << "approval" << std::endl;
+                    // << "approval" << std::endl;
 
           // GET_TIMESTAMP(ts_start);
           if (hard_reset) {
@@ -828,6 +835,7 @@ class LeaderSwitcher {
   std::vector<uint8_t *> dummy;
   std::vector<uint8_t *> &read_slots;
   size_t sz;
+  std::atomic<int> leader_start_index; 
 
   LeaderPermissionAsker permission_asker;
 
@@ -873,6 +881,15 @@ class LeaderElection {
     return leader_switcher.leaderSignal();
   }
 
+  // made public
+  void stopHeartbreat() {
+    if (hb_started) {
+      hb_exit_signal.set_value();
+      heartbeat_thd.join();
+      hb_started = false;
+    }
+  }
+
  private:
   void startHeartbeat() {
     if (hb_started) {
@@ -881,7 +898,15 @@ class LeaderElection {
     hb_started = true;
 
     leader_heartbeat = LeaderHeartbeat(&ctx);
+    if(threadConfig.prefix == "Secondary-")
+      leader_heartbeat.start_id.store(1);
+    else
+      leader_heartbeat.start_id.store(0);
     std::future<void> ftr = hb_exit_signal.get_future();
+    uint64_t start_hb = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch())
+            .count();
+    std::cout << "started heartbeat at " << start_hb << std::endl;
     heartbeat_thd = std::thread([this, ftr = std::move(ftr)]() {
       leader_heartbeat.startPoller();
 
@@ -947,13 +972,21 @@ class LeaderElection {
           response_blocked.store(false);
           leader_heartbeat.scanHeartbeats();
         } else if (prev_command == 'c') {
-	  response_blocked.store(true);
+	        response_blocked.store(true);
           leader_heartbeat.retract();
         }
 
         prev_command = current_command;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        // ADDED FARZIN
+        // std::cout << "checking exit" << std::endl;
+          if (ftr.wait_for(std::chrono::seconds(0)) ==
+              std::future_status::ready) {
+            std::cout << "exiting heartbeat..." << std::endl;
+            break;
+          }
 
         // if (i == 0) {
         //   if (ftr.wait_for(std::chrono::seconds(0)) !=
@@ -965,7 +998,8 @@ class LeaderElection {
         // std::this_thread::sleep_for(std::chrono::seconds(10));
       }
 
-      file_watcher_thd.join();
+      // file_watcher_thd.join();
+      file_watcher_thd.detach();
     });
 
     if (threadConfig.pinThreads) {
@@ -977,32 +1011,25 @@ class LeaderElection {
     }
   }
 
-  void stopHeartbreat() {
-    if (hb_started) {
-      hb_exit_signal.set_value();
-      heartbeat_thd.join();
-      hb_started = false;
-    }
-  }
-
   void startLeaderSwitcher() {
     if (switcher_started) {
       throw std::runtime_error("Already started");
     }
     switcher_started = true;
-
     leader_switcher = LeaderSwitcher(&ctx, &leader_heartbeat);
     std::future<void> ftr = switcher_exit_signal.get_future();
     switcher_thd = std::thread([this, ftr = std::move(ftr)]() {
       leader_switcher.startPoller();
       for (unsigned long long i = 0;; i = (i + 1) & iterations_ftr_check) {
         leader_switcher.scanPermissions();
-        if (i == 0) {
-          if (ftr.wait_for(std::chrono::seconds(0)) !=
-              std::future_status::timeout) {
-            break;
-          }
-        }
+        // if (i == 0) {
+        //   std::cout << "inside exit check" << std::endl;
+        //   if (ftr.wait_for(std::chrono::seconds(0)) !=
+        //       std::future_status::timeout) {
+        //     std::cout << "exiting heartbeat..." << std::endl;
+        //     break;
+        //   }
+        // }
       }
     });
 

@@ -25,7 +25,7 @@
 using namespace dory;
 using dory::units::operator""_GiB;
 
-size_t allocated_size = 1_GiB;
+size_t allocated_size = 4_GiB;
 int alignment = 64;
 
 

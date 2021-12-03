@@ -101,7 +101,6 @@ class Follower {
 
  private:
   void run() {
-    std::cout << "started follower thread" << std::endl;
     int loops = 0;
     constexpr unsigned mask = (1 << 14) - 1;  // Must be power of 2 minus 1
 
@@ -123,7 +122,6 @@ class Follower {
           log_mutex.lock();
         }
       }
-      std::cout << "checking queue" << std::endl;
       auto has_next = iter->sampleNext();
       if (!has_next) {
         continue;
@@ -131,9 +129,8 @@ class Follower {
 
       ParsedSlot pslot(iter->location());
       // std::cout << "Discovered element on position " <<
-      // uintptr_t(iter->location()) << std::endl; std::cout << "Accepted
-      // proposal " << pslot.acceptedProposal()
-      //           << std::endl;
+      // uintptr_t(iter->location()) << std::endl; 
+      // std::cout << "Accepted proposal " << pslot.acceptedProposal() << std::endl;
       // std::cout << "First undecided offset " << pslot.firstUndecidedOffset()
       //           << std::endl;
       // auto [buf, len] = pslot.payload();

@@ -1,0 +1,2 @@
+grep -r throughput: wellcoordination/workload/6-1000000-90/courseware/results/
+| sort -t: -n -k2

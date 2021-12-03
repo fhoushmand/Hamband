@@ -26,9 +26,14 @@ MESSAGE( STATUS "CMAKE_BUILD_TYPE: " ${CMAKE_BUILD_TYPE} )
 MESSAGE( STATUS "CMAKE_INTERPROCEDURAL_OPTIMIZATION: " ${CMAKE_INTERPROCEDURAL_OPTIMIZATION} )
 
 add_executable(
+    mu
+    mu-main.cpp
+)
+
+add_executable(
     hamsaz
-    main.cpp
-    test.cpp
+    hamsaz-main.cpp
 )
 
 target_link_libraries(hamsaz ${CONAN_LIBS} pthread)
+target_link_libraries(mu ${CONAN_LIBS} pthread)

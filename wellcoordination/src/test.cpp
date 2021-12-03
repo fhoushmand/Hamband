@@ -109,7 +109,7 @@
 //   std::cout << "end\n";
 //   return 0;
 // }
-#include "courseware.hpp"
+// #include "courseware.hpp"
 
 // int main(int argc, char* argv[]) {
 //     Courseware cw = Courseware();
@@ -142,3 +142,73 @@
 
 
 // }
+
+
+
+
+
+
+
+
+// for (i = 1; i <= num_ops; i++) {
+  //   unsigned int random = std::rand() % 100;
+  //   std::string callStr;
+  //   // write
+  //   if(random <= write_percentage - 1)
+  //   {
+  //     int type = std::rand() % 4;
+  //     // to distributed writes on followers equal to the leader
+  //     if(!leader)
+  //       type = 3;
+  //     // addCourse
+  //     if (type == 0) {
+  //       std::string c_id = std::to_string(std::rand() % 100);
+  //       callStr = "0 " + c_id;
+  //       test.addCourse(c_id);
+  //     }
+  //     // deleteCourse
+  //     else if (type == 1) {
+  //       std::string c_id = std::to_string(std::rand() % 100);
+  //       callStr = "1 " + c_id;
+  //       test.deleteCourse(c_id);
+  //     }
+  //     // enroll
+  //     else if (type == 2) {
+  //       if(test.students.size() == 0 || test.courses.size() == 0)
+  //         continue;
+  //       auto it = std::begin(test.students);
+  //       std::advance(it,rand() % test.students.size());
+  //       std::string s_id = *it;
+
+  //       it = std::begin(test.courses);
+  //       std::advance(it,rand() % test.courses.size());
+  //       std::string c_id = *it;
+
+  //       callStr = "2 " + s_id + "-" + c_id;
+  //       test.enroll(s_id, c_id);
+  //     }
+  //     // registerStudent
+  //     else if (type == 3) {
+  //       std::string s_id = std::to_string(std::rand() % 10000);
+  //       callStr = "3 " + s_id;
+  //       test.registerStudent(s_id);
+  //     }
+  //   }
+  //   // read
+  //   else if(random > (write_percentage - 1)  && random <= 100)
+  //   {
+  //     // query
+  //     callStr = "4";
+  //   }
+
+  //   if(protocol.request(callStr, false, false)){
+
+  //     expected_calls++;
+  //   }
+  //   // protocol.request(callStr, false, false);
+  // }
+  // int expected_calls = 93798; // for 50000 50
+  // int expected_calls = 187729; // for 100000 50
+
+  // not working
+  // int expected_calls = 1877136; // for 1000000 50

@@ -55,6 +55,9 @@ class RdmaConsensus {
   int propose(uint8_t *buf, size_t len);
 
   inline int potentialLeader() { return potential_leader; }
+  inline bool amILeader() { return am_I_leader.load(); }
+
+  void stopHeartbeatThread() {leader_election->stopHeartbreat();}
 
   inline std::pair<uint64_t, uint64_t> proposedReplicatedRange() {
     return std::make_pair(majW->range_start, majW->range_end);

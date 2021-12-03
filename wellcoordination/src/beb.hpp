@@ -75,6 +75,7 @@ BE_Broadcast::BE_Broadcast(int id, std::vector<int> r_ids) {
   ids.push_back(self);
   // Exchange info using memcached
   auto& store = MemoryStore::getInstance();
+  // MemoryStore store = MemoryStore("beb");
   // Get the last device
   {
     // TODO: The copy constructor is invoked here if we use auto and then

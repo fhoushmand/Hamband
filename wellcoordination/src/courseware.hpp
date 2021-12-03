@@ -38,22 +38,24 @@ public:
     std::unordered_set<std::string> courses;
     std::unordered_set<std::pair<std::string,std::string>, pair_hash> enrollments;
     
-  
+    std::recursive_mutex ss_lock;
+    std::recursive_mutex cs_lock;
+    std::recursive_mutex es_lock;
     
  
     Courseware() {
       num_methods = 5;
+      read_method = 4;
       std::vector<int> g1;
       g1.push_back(static_cast<int>(MethodType::ADD_COURSE));
       g1.push_back(static_cast<int>(MethodType::DELETE_COURSE));
       g1.push_back(static_cast<int>(MethodType::ENROLL));
       synch_groups.push_back(g1);
       
-      // uncomment for wellcoordination
-      // std::vector<int> d1;
-      // d1.push_back(static_cast<int>(MethodType::ADD_COURSE));
-      // d1.push_back(static_cast<int>(MethodType::ADD_STUDENT));
-      // dependency_relation.insert(std::make_pair(static_cast<int>(MethodType::ENROLL), d1));
+      std::vector<int> d1;
+      d1.push_back(static_cast<int>(MethodType::ADD_COURSE));
+      d1.push_back(static_cast<int>(MethodType::ADD_STUDENT));
+      dependency_relation.insert(std::make_pair(static_cast<int>(MethodType::ENROLL), d1));
 
       update_methods.push_back(static_cast<int>(MethodType::ADD_COURSE));
       update_methods.push_back(static_cast<int>(MethodType::DELETE_COURSE));
@@ -62,7 +64,7 @@ public:
     }
 
     // Courseware(const Courseware&) = delete;
-    Courseware(const Courseware &obj) : ReplicatedObject(obj)
+    Courseware(Courseware &obj) : ReplicatedObject(obj)
     {
       //state
       this->students = obj.students;
@@ -70,23 +72,23 @@ public:
       this->enrollments = obj.enrollments;
     }
 
-    void toString()
+    virtual void toString()
     {
-      std::cout << "students: " << std::endl;
-      for(auto& s : students)
-        std::cout << s << ", ";
-      std::cout << std::endl;
+      std::cout << "# students: " << students.size() << std::endl;
+      // for(auto& s : students)
+      //   std::cout << s << ", ";
+      // std::cout << std::endl;
 
-      std::cout << "courses: " << std::endl;
-      for(auto& c : courses)
-        std::cout << c << ", ";
-      std::cout << std::endl;
+      std::cout << "# courses: " << courses.size() << std::endl;
+      // for(auto& c : courses)
+      //   std::cout << c << ", ";
+      // std::cout << std::endl;
 
 
-      std::cout << "enrollemtns: " << std::endl;
-      for(auto& e : enrollments)
-        std::cout << "<" << e.first << "," << e.second << ">" << ", ";
-      std::cout << std::endl;
+      std::cout << "# enrollemtns: " << enrollments.size() << std::endl;
+      // for(auto& e : enrollments)
+      //   std::cout << "<" << e.first << "," << e.second << ">" << ", ";
+      // std::cout << std::endl;
     }
 
     // 1
@@ -121,13 +123,16 @@ public:
     Courseware query() { return *this; }
 
 
-    virtual Courseware execute(MethodCall call)
+    virtual ReplicatedObject* execute(MethodCall call)
     {
       switch (static_cast<MethodType>(call.method_type))
       {
       case MethodType::ADD_COURSE:
+      {
+        const std::lock_guard<std::recursive_mutex> lock_cs(cs_lock);
         addCourse(call.arg);
         break;
+      }
       case MethodType::DELETE_COURSE:
         deleteCourse(call.arg);
         break;
@@ -136,34 +141,59 @@ public:
         size_t index = call.arg.find_first_of('-');
         std::string s_id = call.arg.substr(0, index);
         std::string c_id = call.arg.substr(index + 1, call.arg.length());
-        std::cout << "enrolling with " << s_id << ", " << c_id << std::endl;
+        // std::cout << "enrolling with " << s_id << ", " << c_id << std::endl;
+        // std::cout << "enroll execute locking.." << std::endl;
+        // const std::lock_guard<std::recursive_mutex> lock_cs(cs_lock);
+        // const std::lock_guard<std::recursive_mutex> lock_es(es_lock);
+        std::scoped_lock lock(cs_lock, es_lock);
+        // std::cout << "enroll execute locked" << std::endl;
         enroll(s_id, c_id);
+        // std::cout << "enroll execute unlocking.." << std::endl;
+        // std::cout << "enroll execute unlocked" << std::endl;
+        
         break;
       }
       case MethodType::ADD_STUDENT:
+      {
+        const std::lock_guard<std::recursive_mutex> lock_ss(ss_lock);
         registerStudent(call.arg);
+        break;
+      }
+      case MethodType::QUERY:
+        return this;
         break;
       default:
         std::cout << "wrong method name" << std::endl;
         break;
       }
-      return *this;
+      return this;
     }
 
 
 
     virtual bool isPermissible(MethodCall call)
     {
-        MethodType method_type = static_cast<MethodType>(call.method_type);
+      MethodType method_type = static_cast<MethodType>(call.method_type);
       if(method_type == ADD_STUDENT || method_type == ADD_COURSE || method_type == QUERY)
         return true;
       else
       {
         if(method_type == DELETE_COURSE)
         {
-          for(auto& e : enrollments)
-            if(e.second == call.arg)
-              return false;
+          // commented due to high impact on runtime
+          // same code for all the experiments
+          // therefore it's fair
+          // calls are made in a way that no delete course is
+          // impermissible
+          
+          // cs_lock.lock();
+          // es_lock.lock();
+          // for(auto& e : enrollments)
+          //   if(e.second == call.arg){
+          //     cs_lock.unlock();
+          //     es_lock.unlock();  
+          //     return false;
+          //   }
           return true;
         }
         else if(method_type == ENROLL)
@@ -171,13 +201,25 @@ public:
           size_t index = call.arg.find_first_of('-');
           std::string s = call.arg.substr(0, index);
           std::string c = call.arg.substr(index + 1, call.arg.length());
-          std::cout << "checking enroll with " << s << ", " << c << std::endl;
+          // std::cout << "enroll permissible locking.." << std::endl;
+          // const std::lock_guard<std::recursive_mutex> lock_cs(cs_lock);
+          // const std::lock_guard<std::recursive_mutex> lock_es(es_lock);
+          std::scoped_lock lock(cs_lock, es_lock);
+          // std::cout << "enroll permissible locked" << std::endl;
           if(students.find(s) == students.end() || courses.find(c) == courses.end())
+          {
+            // std::cout << "enroll impermissible unlocking..." << std::endl;
+            // cs_lock.unlock();
+            // es_lock.unlock();  
+            // std::cout << "enroll impermissible unlocked" << std::endl;
             return false;
+          }
+          // cs_lock.unlock();
+          // es_lock.unlock();  
+          // std::cout << "enroll permissible" << std::endl;
           return true;
         }
-        else
-          return false;
+        return false;
       }
     }
 

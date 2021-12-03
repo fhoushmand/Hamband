@@ -1,7 +1,7 @@
 source load_modules.sh
-./build.py crash-consensus;
+./build.py crash-consensus -b debug;
 crash-consensus/libgen/export.sh gcc-release;
-crash-consensus/demo/using_conan_fully/build.sh gcc-release;
+crash-consensus/demo/using_conan_fully/build.sh gcc-debug;
 #crash-consensus/experiments/build.sh
 
 # fix this

@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <numeric>
-#include <optional>
 #include <set>
 #include <string>
 #include <cstring>
@@ -56,6 +55,7 @@ class ReplicatedObject {
   /* data */
  public:
   int num_methods;
+  int read_method;
   std::vector<int> update_methods;
   std::vector<std::vector<int>> synch_groups;
   std::map<int, std::vector<int>> dependency_relation;
@@ -72,8 +72,9 @@ class ReplicatedObject {
       this->dependency_relation = obj.dependency_relation;
     }
 
-  ReplicatedObject execute(MethodCall call);
-  bool isPermissible(ReplicatedObject preState);
+  virtual ReplicatedObject* execute(MethodCall call) = 0;
+  virtual bool isPermissible(MethodCall call) = 0;
+  virtual void toString() = 0;
 
   int getSynchGroup(int method_type)
   {
@@ -96,9 +97,9 @@ class MethodCallFactory {
 
   MethodCallFactory() {}
 
-  MethodCallFactory(ReplicatedObject obj, uint64_t r) {
-    this->total_dependent_methods = obj.dependency_relation.size();
-    this->dependency_relation = obj.dependency_relation;
+  MethodCallFactory(ReplicatedObject* obj, uint64_t r) {
+    this->total_dependent_methods = obj->dependency_relation.size();
+    this->dependency_relation = obj->dependency_relation;
     this->num_replicas = r;
   }
 
@@ -168,7 +169,7 @@ class MethodCallFactory {
            sizeof(int) + num_replicas * num_dependencies * sizeof(int);
   }
 
-  MethodCall deserialize(uint8_t* buffer) {
+  MethodCall* deserialize(uint8_t* buffer) {
     uint64_t len = *reinterpret_cast<uint64_t*>(buffer);
     // std::cout << "-tot_size: " << len << std::endl;
 
@@ -218,21 +219,24 @@ class MethodCallFactory {
       dependencies_offset += num_replicas * sizeof(int);
     }
 
-    MethodCall out = MethodCall(id, method_type, arg, dependency_vectors);
+    MethodCall* out = new MethodCall(id, method_type, arg, dependency_vectors);
 
     return out;
   }
 
   void toString(MethodCall call) {
-    std::cout << "method: " << call.method_type << std::endl;
-    std::cout << "id: " << call.id << std::endl;
-    std::cout << "arg: " << call.arg << std::endl;
-
+    std::cout << "(" << call.id << ")" << ":" << call.method_type << " " << call.arg << std::endl;
+    
     // for (size_t x = 0; x < dependency_relation[call.method_type].size(); x++) {
-    //   std::cout << "method " << dependency_relation[call.method_type][x] << ":" << std::endl;
+    //   std::cout << dependency_relation[call.method_type][x] << " = {";
     //   for (size_t i = 0; i < num_replicas; i++)
-    //     std::cout << call.dependency_vectors[x][i] << ", ";
-    //   std::cout << std::endl;
+    //   {
+    //     if(i != num_replicas - 1)
+    //       std::cout << call.dependency_vectors[x][i] << ", ";
+    //     else
+    //       std::cout << call.dependency_vectors[x][i];
+    //   }
+    //   std::cout << "}" << std::endl;
     // }
   }
 

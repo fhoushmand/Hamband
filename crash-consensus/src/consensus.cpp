@@ -1,10 +1,6 @@
 #include "consensus.hpp"
 
 #include <iostream>
-// #include <algorithm>
-// #include <functional>
-
-// #include "protocol/nb-protocol.cpp"
 
 namespace dory {
 RdmaConsensus::RdmaConsensus(int my_id, std::vector<int>& remote_ids,
@@ -20,7 +16,7 @@ RdmaConsensus::RdmaConsensus(int my_id, std::vector<int>& remote_ids,
       LOGGER_INIT(logger, ConsensusConfig::logger_prefix) {
   using namespace units;
 
-  allocated_size = 2_GiB;
+  allocated_size = 4_GiB;
   alignment = 64;
 
   run();

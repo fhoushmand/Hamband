@@ -2,7 +2,7 @@ from conans import ConanFile, CMake
 
 
 class DoryDemoConan(ConanFile):
-    name = "hamsaz"
+    name = "mu"
     version = "0.0.1"
     license = "MIT"
     # url = "TODO"

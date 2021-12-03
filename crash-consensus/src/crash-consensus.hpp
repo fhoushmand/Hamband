@@ -37,8 +37,11 @@ class Consensus {
 
   ProposeError propose(uint8_t *buf, size_t len);
   int potentialLeader();
+  bool amILeader();
   bool blockedResponse();
   std::pair<uint64_t, uint64_t> proposedReplicatedRange();
+
+  void stopHeartbeatThread();
 
  private:
   std::unique_ptr<RdmaConsensus> impl;
