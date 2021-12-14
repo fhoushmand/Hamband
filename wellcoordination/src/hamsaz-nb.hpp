@@ -13,7 +13,8 @@ class NB_Wellcoordination : Synchronizer {
  public:
   // common in all the use-cases
   int self;
-  uint64_t req_id = 0;
+  uint64_t next_id;
+  uint64_t fast_id;
   size_t num_process;
   std::vector<int> remote_ids;
   std::vector<ptrdiff_t> partitions_offset;
@@ -47,7 +48,7 @@ class NB_Wellcoordination : Synchronizer {
     // (LogConfig::LOG_SIZE/num_process)*part_num
     for (size_t i = 0; i < num_process; i++) {
       partitions_offset[i] =
-          LogConfig::round_up_powerof2(LogConfig::LOG_SIZE / num_process) * i;
+          LogConfig::round_up_powerof2(LogConfig::LOG_SIZE / num_process) * i + 1024;
     }
 
     eventualSender = std::make_unique<BE_Broadcast>(id, remote_ids);
@@ -57,9 +58,9 @@ class NB_Wellcoordination : Synchronizer {
     for (size_t i = 0; i < repl_object->synch_groups.size(); i++)
     {
       if(i == 0)
-        synchSenders[i] = std::make_unique<dory::Consensus>(id, remote_ids, 16, dory::ThreadBank::A);
+        synchSenders[i] = std::make_unique<dory::Consensus>(id, remote_ids, 8, dory::ThreadBank::A);
       else
-        synchSenders[i] = std::make_unique<dory::Consensus>(id, remote_ids, 16, dory::ThreadBank::B);
+        synchSenders[i] = std::make_unique<dory::Consensus>(id, remote_ids, 8, dory::ThreadBank::B);
       // this is only called in the followers
       // in the leader, after proposal we directly call response
       // since we know that it can be delivered to the leader right away
@@ -83,6 +84,15 @@ class NB_Wellcoordination : Synchronizer {
     });
     nonConflictingLogReader.detach();
   }
+
+
+  inline uint64_t fetchAndIncFastID() {
+    auto ret = fast_id;
+    fast_id += 1;
+    return ret;
+  }
+
+  inline uint64_t nextFastReqID() const { return fast_id; }
 
   virtual std::pair<ResponseStatus,std::chrono::high_resolution_clock::time_point> request(MethodCall request, bool debug, bool summarize) {
     // a query method
@@ -126,23 +136,35 @@ class NB_Wellcoordination : Synchronizer {
       Call call(*(eventualSender->log.get()), partitions_offset[self - 1],
                 payload, length, summarize);
       auto [address, offset, size] = call.location();
+      
+      auto req_id = fetchAndIncFastID();
+      auto next_req_id = nextFastReqID();
 
-      for (auto& i : remote_ids) {
-        auto pid = i - 1;
-
-        // std::cout << "writing " << payload << " to: " << i << " at: " <<
-        // std::hex
-        //           << eventualSender->ce->connections().at(i).remoteBuf() +
-        //           offset
-        //           << std::endl;
-        auto ok = eventualSender->ce->connections().at(i).postSendSingleCached(
-            ReliableConnection::RdmaWrite,
-            quorum::pack(quorum::EntryWr, i, req_id++), address,
-            static_cast<uint32_t>(size),
-            eventualSender->ce->connections().at(i).remoteBuf() + offset);
+      // if(unlikely(req_id % 999 == 0))
+      if(true)
+      {
+        for (auto& i : remote_ids) {
+          auto ok = eventualSender->ce->connections().at(i).postSendSingle(
+              ReliableConnection::RdmaWrite,
+              quorum::pack(quorum::EntryWr, i, req_id), address,
+              static_cast<uint32_t>(size),
+              eventualSender->ce->connections().at(i).remoteBuf() + offset);
+        }
+        eventualSender->pollCQ();
+        // std::cout << "time spent: " <<  std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count() << std::endl;
       }
-      eventualSender->pollCQ();
-      return response(request, ResponseStatus::NoError, debug);
+      else
+      {
+        for (auto& i : remote_ids) {
+          auto ok = eventualSender->ce->connections().at(i).postSendSingleNoSignal(
+              ReliableConnection::RdmaWrite,
+              quorum::pack(quorum::EntryWr, i, req_id), address,
+              static_cast<uint32_t>(size),
+              eventualSender->ce->connections().at(i).remoteBuf() + offset);
+        }
+      }
+      auto res = response(request, ResponseStatus::NoError, debug);
+      return res;
     }
     // conflicting call
     else {

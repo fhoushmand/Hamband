@@ -35,5 +35,12 @@ add_executable(
     hamsaz-main.cpp
 )
 
+add_executable(
+    test
+    test.cpp
+)
+
+
 target_link_libraries(hamsaz ${CONAN_LIBS} pthread)
 target_link_libraries(mu ${CONAN_LIBS} pthread)
+target_link_libraries(test ${CONAN_LIBS} pthread)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+#include <cstdlib>
 #include <cstdlib>
 #include <functional>
 #include <map>
@@ -36,7 +38,7 @@ class ControlBlock {
   };
 
   // initially it was 128
-  static constexpr int CQDepth = 4096;
+  static constexpr int CQDepth = 2048;
 
   ControlBlock(ResolvedPort &resolved_port);
 

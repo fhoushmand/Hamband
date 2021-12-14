@@ -13,7 +13,7 @@ PartitionedIterator::PartitionedIterator(uint8_t* base_ptr, ptrdiff_t part_lengt
         this->num_partitions = num_partition;
         entry_ptrs.resize(num_partitions);
         for(size_t i = 0; i < num_partition; i++){
-          entry_ptrs[i] = base_ptr + (i * part_length);
+          entry_ptrs[i] = base_ptr + (i * part_length) + 1024;
         }
         
         

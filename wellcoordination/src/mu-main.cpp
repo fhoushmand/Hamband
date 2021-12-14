@@ -272,10 +272,9 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < object->num_methods; i++) {
     total_sum += sum;
     sum = 0;
-    for (auto& pair : response_times[i]){
+    for (auto& pair : response_times[i])
       sum += static_cast<double>(pair.second);
-      num++;
-    }
+		num += response_times[i].size();
     std::cout << "average response time for " << response_times[i].size()
               << " calls to " << i << ": "
               << (sum/1000) / static_cast<int>(response_times[i].size()) << std::endl;

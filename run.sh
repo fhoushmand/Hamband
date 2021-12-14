@@ -47,7 +47,8 @@ mkdir -p $BENCH_DIRECTORY/results;
 
 # MODE=mu
 #for n in $( seq 3 6 ); do
-        for r in $( seq $REP $REP ); do
+        for s in $( seq 1 10 ); do
+                r=$REP
                 #printf "ssh ${nodes[0]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; memcached -vv -p 9999'"
                 ssh ${nodes[0]}.ib.hpcc.ucr.edu 'memcached -vv -p 9999'&
                 sleep 2;
@@ -55,11 +56,11 @@ mkdir -p $BENCH_DIRECTORY/results;
                 for i in $( seq 1 $NUM_NODES ); do
                         #printf "ssh ${nodes[$i]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./crash-consensus/demo/using_conan_fully/build/bin/main-st $i 4096 1 > $i.log'"
                         #ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./wellcoordination/build/bin/hamsaz 2 $i 10000 10 > $i.log&"
-                        printf "ssh ${nodes[$i]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./wellcoordination/build/bin/$MODE $i $NUM_NODES $NUM_OPS $WRITE_PERC $USECASE > $RESULT_LOC$NUM_NODES-$NUM_OPS-$WRITE_PERC/$USECASE/results/$MODE-$i-$r.log'\n";
-                        ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./wellcoordination/build/bin/$MODE $i $NUM_NODES $NUM_OPS $WRITE_PERC $USECASE $THROUGHPUT > $RESULT_LOC$NUM_NODES-$NUM_OPS-$WRITE_PERC/$USECASE/results/$MODE-$i-$r.log&";
+                        printf "ssh ${nodes[$i]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./wellcoordination/build/bin/$MODE $i $NUM_NODES $NUM_OPS $WRITE_PERC $USECASE > $RESULT_LOC$NUM_NODES-$NUM_OPS-$WRITE_PERC/$USECASE/results/$MODE-$i-$r$s.log'\n";
+                        ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./wellcoordination/build/bin/$MODE $i $NUM_NODES $NUM_OPS $WRITE_PERC $USECASE $THROUGHPUT > $RESULT_LOC$NUM_NODES-$NUM_OPS-$WRITE_PERC/$USECASE/results/$MODE-$i-$r$s.log&";
                 done
                 #numactl --membind 0 
-                sleep 200;
+                sleep 30;
                 ssh ${nodes[0]}.ib.hpcc.ucr.edu "bash -s" <./kill-memcached.sh
                 sleep 2;
         done
@@ -85,4 +86,4 @@ mkdir -p $BENCH_DIRECTORY/results;
 
 # done
 
-sleep 100
+# sleep 100

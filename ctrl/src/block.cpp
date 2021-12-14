@@ -185,6 +185,7 @@ void ControlBlock::registerCQ(std::string name) {
                              name);
   }
 
+  std::cout << "creating cq with " << CQDepth << " size." << std::endl;
   auto cq = ibv_create_cq(resolved_port.device().context(), CQDepth, nullptr,
                           nullptr, 0);
 

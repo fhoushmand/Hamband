@@ -242,6 +242,7 @@ int main(int argc, char* argv[]) {
     cs = 0;
     for (int i = 0; i < object->num_methods; i++)
       for (int x = 0; x < nr_procs; x++) cs += protocol.calls_applied[i][x];
+    std::cout << "received: " << cs << std::endl;
     if(sz == 1){
       if (cs == ((id != 1) ? (expected_calls - 1) : expected_calls))
         break;
@@ -250,6 +251,7 @@ int main(int argc, char* argv[]) {
       if (cs == ((id > sz) ? (expected_calls - sz) : expected_calls - 1))
         break;
     }
+    std::this_thread::sleep_for(std::chrono::seconds(2));
   }
 
   uint64_t global_end = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -264,28 +266,6 @@ int main(int argc, char* argv[]) {
   return 0;
 }
 
-// std::thread test([&] {
-  //   int cs = 0;
-  //   int sz = static_cast<int>(object->synch_groups.size());
-  //   while (true) {
-  //     cs = 0;
-  //     for (int i = 0; i < object->num_methods; i++){
-  //       for (int x = 0; x < nr_procs; x++) 
-  //         cs += protocol.calls_applied[i][x];
-  //     }
-  //     // std::cout << "received: " << cs << std::endl;
-  //     if(sz == 1){
-  //       if (cs == ((id != 1) ? (expected_calls - 1) : expected_calls))
-  //         break;
-  //     }
-  //     else{
-  //       if (cs == ((id > sz) ? (expected_calls - sz) : expected_calls - 1))
-  //         break;
-  //     }
-  //     std::this_thread::sleep_for(std::chrono::microseconds(1));
-  //   }
-  // });
-  // test.join();
 
   // uint64_t min_start_time = std::numeric_limits<uint64_t>::max(); 
  // // read all start times

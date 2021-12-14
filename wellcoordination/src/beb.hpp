@@ -15,9 +15,9 @@
 #include <dory/shared/unused-suppressor.hpp>
 #include <dory/store.hpp>
 
+#include <atomic>
 #include <dory/log/context.hpp>
 #include <dory/mem/memory.hpp>
-#include <atomic>
 
 #include "logger.hpp"
 
@@ -25,52 +25,40 @@ using namespace dory;
 
 using dory::units::operator""_GiB;
 
-// size_t allocated_size = 1_GiB;
 int alignment = 64;
+uint64_t next_id;
+uint64_t fast_id;
 
 namespace hamsaz {
 class BE_Broadcast {
  private:
-  bool broadcastCall(uint8_t* payload, size_t len, uint64_t seq_number,
-                     int* deps, bool override);
   std::unique_ptr<ControlBlock> cb;
-  std::vector<uintptr_t> to_remote_memory, dest;
   std::vector<struct ibv_wc> entries;
   Devices d;
   OpenDevice od;
-  
 
  public:
   int self;
-  std::atomic<int> num_writes = 0;
   size_t num_process;
   std::vector<int> remote_ids;
   std::vector<int> ids;
+  std::vector<ptrdiff_t> partitions_offset;
   PartitionedIterator partIter;
-  std::vector<ptrdiff_t> remote_offsets;
   std::unique_ptr<ConnectionExchanger> ce;
   std::unique_ptr<HamsazLog> log;
+  
   BE_Broadcast(int id, std::vector<int> remote_ids);
-
-  bool broadcastCallWithDep(uint8_t* payload, size_t len, uint64_t seq_number,
-                            int* deps, bool override);
-  bool broadcastCallNoDep(uint8_t* payload, size_t len, uint64_t seq_number,
-                          bool override);
-
-  bool sendCall(int receiver, uint8_t* payload, size_t len, uint64_t seq_number,
-                            int* deps, bool override);
-
-  bool pollCQ();
-
-  bool consume(std::vector<struct ibv_wc>& entries);
-  
-  
+  bool broadcastCall(uint8_t* payload, size_t len, bool override);
+  int pollCQ();
+  bool consume();
 };
 
 BE_Broadcast::BE_Broadcast(int id, std::vector<int> r_ids) {
   self = id;
   num_process = r_ids.size() + 1;
   remote_ids = r_ids;
+  entries.resize(remote_ids.size()*1000);
+  partitions_offset.resize(num_process);
   ids.insert(ids.end(), remote_ids.begin(), remote_ids.end());
   ids.push_back(self);
   // Exchange info using memcached
@@ -99,7 +87,8 @@ BE_Broadcast::BE_Broadcast(int id, std::vector<int> r_ids) {
                      ControlBlock::REMOTE_READ | ControlBlock::REMOTE_WRITE);
   cb->registerCQ("hamsaz-cq");
   ce = std::make_unique<ConnectionExchanger>(self, remote_ids, *cb.get());
-  ce->configure_all("hamsaz-primary", "hamsaz-shared-mr", "hamsaz-cq", "hamsaz-cq");
+  ce->configure_all("hamsaz-primary", "hamsaz-shared-mr", "hamsaz-cq",
+                    "hamsaz-cq");
   ce->announce_all(store, "hamsaz-qp");
   ce->announce_ready(store, "hamsaz-qp", "announce");
   ce->wait_ready_all(store, "hamsaz-qp", "announce");
@@ -116,121 +105,79 @@ BE_Broadcast::BE_Broadcast(int id, std::vector<int> r_ids) {
   auto logmem = shared_memory_addr;
   auto logmem_size = LogConfig::LOG_SIZE;
   log = std::make_unique<HamsazLog>(logmem, logmem_size, num_process);
-  std::cout << "log created" << std::endl;
   std::cout << "logmem_size: " << logmem_size << std::endl;
   printf("log address: %p", logmem);
   std::cout << std::endl;
 
-  remote_offsets.resize(num_process);
-  // each partition has an offset of: (logmem_size/num_process)*part_num
+  // each partition has an offset of:
+  // (LogConfig::LOG_SIZE/num_process)*part_num
   for (size_t i = 0; i < num_process; i++) {
-    remote_offsets[i] =
-        LogConfig::round_up_powerof2(logmem_size / num_process) * i;
+    partitions_offset[i] =
+      LogConfig::round_up_powerof2(LogConfig::LOG_SIZE / num_process) * i + 1024;
   }
-  partIter = log->partitionedIterator();
 
-  // adding log_offset to all the remote entries and store it in dest vector
-  // std::cout << "max ids: " << Identifiers::maxID(ids) << std::endl;
-  to_remote_memory.resize(Identifiers::maxID(ids));
-  std::fill(to_remote_memory.begin(), to_remote_memory.end(),
-            static_cast<uintptr_t>(0));
-  dest = to_remote_memory;
+  partIter = log->partitionedIterator();
 }
 
-bool BE_Broadcast::broadcastCall(uint8_t* payload, size_t len,
-                                 uint64_t seq_number, int* deps,
-                                 bool override = false) {
-  // second argument indicates the offset for the corresponding log of this
-  // process in the remote hosts
-  Call call(*(log.get()), remote_offsets[self - 1], payload, len,
-            override);
+inline uint64_t fetchAndIncFastID() {
+    auto ret = fast_id;
+    fast_id += 1;
+    return ret;
+  }
+
+inline uint64_t nextFastReqID() { return fast_id; }
+
+bool BE_Broadcast::broadcastCall(uint8_t* payload, size_t length, bool summarize) {
+  Call call(*log.get(), partitions_offset[self - 1],
+                payload, length, summarize);
   auto [address, offset, size] = call.location();
-  for (auto& c : ce->connections()) {
-    // -1 is because ids are 1 based but arrays are zero based
-    auto pid = c.first - 1;
-    auto& rc = c.second;
 
-    std::transform(to_remote_memory.begin(), to_remote_memory.end(),
-                   dest.begin(), bind2nd(std::plus<uintptr_t>(), offset));
+  auto req_id = fetchAndIncFastID();
+  auto next_req_id = nextFastReqID();
 
-    if (false) {
-      std::cout << "call offset: " << offset << std::endl;
-      std::cout << "dest[pid]: " << dest[pid] << std::endl;
-      // writing to remote
-      std::cout << "writing " << payload << " to: " << pid + 1
-                << " at: " << std::hex << rc.remoteBuf() + dest[pid]
-                << std::endl;
-      std::cout << "remote buf address " << std::hex << rc.remoteBuf()
-                << std::endl;
-      std::cout << std::endl << std::endl;
+  for (auto& conn : ce->connections()) {
+    std::cout << "writing " << payload << " to: " << conn.first << " at: " <<
+    std::hex
+              << conn.second.remoteBuf() << "\t"
+              << offset
+              << std::endl;
+    auto ok = conn.second.postSendSingle(
+        ReliableConnection::RdmaWrite, quorum::pack(quorum::EntryWr, self, req_id),
+        address, static_cast<uint32_t>(size),
+        conn.second.remoteBuf() + offset);
+    if(conn.first == 1)
+    {
+      memcpy(log.get()->bufPtr(), address, 10);
     }
 
-    std::cout << "writing " << payload << " to: " << pid + 1
-                << " at: " << std::hex << rc.remoteBuf() + dest[pid]
-                << std::endl;
-      
-
-    auto ok = rc.postSendSingle(ReliableConnection::RdmaWrite,
-                                quorum::pack(quorum::EntryWr, pid, seq_number),
-                                address, static_cast<uint32_t>(size),
-                                rc.remoteBuf() + dest[pid]);
-    if (!ok) return false;
   }
   return true;
 }
 
-bool BE_Broadcast::broadcastCallWithDep(uint8_t* payload, size_t len,
-                                        uint64_t seq_number, int* deps,
-                                        bool override = false) {
-  return broadcastCall(payload, len, seq_number, deps, override);
-}
-
-bool BE_Broadcast::broadcastCallNoDep(uint8_t* payload, size_t len,
-                                      uint64_t seq_number,
-                                      bool override = false) {
-  return broadcastCall(payload, len, seq_number, NULL, override);
-}
-
-bool BE_Broadcast::consume(std::vector<struct ibv_wc>& entries) {
+bool BE_Broadcast::consume() {
   auto ret = true;
   for (auto const& entry : entries) {
     if (entry.status != IBV_WC_SUCCESS) {
       std::cout << "write not successfull" << std::endl;
       ret = false;
-    } else {
-      num_writes++;
-      auto [k, pid, seq] = quorum::unpackAll<int64_t, int64_t>(entry.wr_id);
-
-      // if (k != kind) {
-      //   std::cout << "Mismatched message kind: (" << quorum::type_str(k)
-      //             << " vs " << quorum::type_str(kind)
-      //             << "). Received unexpected/old message response from the "
-      //                "completion queue"
-      //             << std::endl;
-      //   continue;
-      // }
-
-      // auto current_seq = scoreboard[pid];
-      // scoreboard[pid] = next_id - current_seq == modulo ? seq : 0;
-
-      // if (scoreboard[pid] == next_id) {
-      //   left -= 1;
-      // }
-
-      // if (left == 0) {
-      //   left = quorum_size;
-      //   next_id += modulo;
-      // }
     }
   }
+  // entries.clear();
   return ret;
 }
 
-bool BE_Broadcast::pollCQ()
-{
-  entries.resize(remote_ids.size()*10);
-  cb->pollCqIsOK(cb->cq("hamsaz-cq"), entries);
-  return consume(entries);
+int BE_Broadcast::pollCQ() {
+  // entries.resize(static_cast<int>(remote_ids.size()) * 8 + 3);
+  // cb->pollCqIsOK(cb->cq("hamsaz-cq"), remote_ids.size() * 8 + 3);
+  int num = ibv_poll_cq(cb->cq("hamsaz-cq").get(), static_cast<int>(remote_ids.size())*1000, &entries[0]);
+  // std::cout << "num polled: " << num << std::endl; 
+  // if (num >= 0) 
+  //   consume();
+  // ibv_poll_cq(cb->cq("hamsaz-cq").get(), static_cast<int>(remote_ids.size()),
+              // &entries[0]);
+  return 1;
+  // return ibv_poll_cq(cb->cq("hamsaz-cq").get(),
+  // static_cast<int>(entries.size()), &entries[0]);
 }
 
 }  // namespace hamsaz

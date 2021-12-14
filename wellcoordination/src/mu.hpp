@@ -21,8 +21,6 @@ class Mu : Synchronizer {
 
   ReplicatedObject* repl_object;
 
-  const uint64_t QUEUE_SIZE = 10000;
-
   ~Mu() {}
 
   Mu(int id, std::vector<int> r_ids, ReplicatedObject* obj) {
@@ -37,7 +35,7 @@ class Mu : Synchronizer {
     for (int x = 0; x < repl_object->num_methods; x++)
       for (size_t i = 0; i < num_process; i++) calls_applied[x][i] = 0;
     
-    synchSenders = std::make_unique<dory::Consensus>(id, remote_ids, 16,
+    synchSenders = std::make_unique<dory::Consensus>(id, remote_ids, 8,
                                                      dory::ThreadBank::A);
 
     // this is only called in the followers

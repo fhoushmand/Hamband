@@ -1,0 +1,17 @@
+1) By using selective signalling we can reduce the cpu usage at the sender side and imporve response time
+of the coflict-free calls such as deposit and register
+Here are the information:
+    https://www.rdmamojo.com/2014/06/30/working-unsignaled-completions/
+    https://www.rdmamojo.com/2013/06/08/tips-and-tricks-to-optimize-your-rdma-code/#Work_with_selective_signaling_in_the_Send_Queue
+
+2) Make sure the synchronization logic for the state manipulation in courseware is correct
+Right now, I only lock students relation for checking the permissibility of enrolls and when registering student.
+    Can we synthesize this given the conflict graph? (dependency edges between connected components and free vertices create synchronization)
+
+*3) Sometimes, there are missing received writes (myabe due to the completion queue overflow??)
+
+4) Poor performance for dependent methods is due to dependency calculation NOT waiting.
+
+5) Almost .7 microseconds speedup in response time when doing polling with 1000 batch for bank and courseware.
+However, some writes are missing!
+

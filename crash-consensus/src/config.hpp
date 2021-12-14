@@ -30,7 +30,7 @@ static constexpr int followerThreadBankB_ID = 18;
 
 struct ThreadConfig {
   ThreadConfig()
-      : pinThreads{true},
+      : pinThreads{false},
         handoverThreadCoreID{handoverThreadBankAB_ID},
         consensusThreadCoreID{consensusThreadBankA_ID},
         switcherThreadCoreID{switcherThreadBankA_ID},

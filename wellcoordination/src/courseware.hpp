@@ -38,10 +38,7 @@ public:
     std::unordered_set<std::string> courses;
     std::unordered_set<std::pair<std::string,std::string>, pair_hash> enrollments;
     
-    std::recursive_mutex ss_lock;
-    std::recursive_mutex cs_lock;
-    std::recursive_mutex es_lock;
-    
+    std::recursive_mutex ss_lock;  
  
     Courseware() {
       num_methods = 5;
@@ -129,7 +126,6 @@ public:
       {
       case MethodType::ADD_COURSE:
       {
-        const std::lock_guard<std::recursive_mutex> lock_cs(cs_lock);
         addCourse(call.arg);
         break;
       }
@@ -141,16 +137,7 @@ public:
         size_t index = call.arg.find_first_of('-');
         std::string s_id = call.arg.substr(0, index);
         std::string c_id = call.arg.substr(index + 1, call.arg.length());
-        // std::cout << "enrolling with " << s_id << ", " << c_id << std::endl;
-        // std::cout << "enroll execute locking.." << std::endl;
-        // const std::lock_guard<std::recursive_mutex> lock_cs(cs_lock);
-        // const std::lock_guard<std::recursive_mutex> lock_es(es_lock);
-        std::scoped_lock lock(cs_lock, es_lock);
-        // std::cout << "enroll execute locked" << std::endl;
-        enroll(s_id, c_id);
-        // std::cout << "enroll execute unlocking.." << std::endl;
-        // std::cout << "enroll execute unlocked" << std::endl;
-        
+        enroll(s_id, c_id); 
         break;
       }
       case MethodType::ADD_STUDENT:
@@ -185,15 +172,6 @@ public:
           // therefore it's fair
           // calls are made in a way that no delete course is
           // impermissible
-          
-          // cs_lock.lock();
-          // es_lock.lock();
-          // for(auto& e : enrollments)
-          //   if(e.second == call.arg){
-          //     cs_lock.unlock();
-          //     es_lock.unlock();  
-          //     return false;
-          //   }
           return true;
         }
         else if(method_type == ENROLL)
@@ -201,22 +179,9 @@ public:
           size_t index = call.arg.find_first_of('-');
           std::string s = call.arg.substr(0, index);
           std::string c = call.arg.substr(index + 1, call.arg.length());
-          // std::cout << "enroll permissible locking.." << std::endl;
-          // const std::lock_guard<std::recursive_mutex> lock_cs(cs_lock);
-          // const std::lock_guard<std::recursive_mutex> lock_es(es_lock);
-          std::scoped_lock lock(cs_lock, es_lock);
-          // std::cout << "enroll permissible locked" << std::endl;
+          const std::lock_guard<std::recursive_mutex> lock_ss(ss_lock);
           if(students.find(s) == students.end() || courses.find(c) == courses.end())
-          {
-            // std::cout << "enroll impermissible unlocking..." << std::endl;
-            // cs_lock.unlock();
-            // es_lock.unlock();  
-            // std::cout << "enroll impermissible unlocked" << std::endl;
             return false;
-          }
-          // cs_lock.unlock();
-          // es_lock.unlock();  
-          // std::cout << "enroll permissible" << std::endl;
           return true;
         }
         return false;

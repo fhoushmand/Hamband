@@ -338,7 +338,6 @@ bool ReliableConnection::postSendSingle(RdmaReq req, uint64_t req_id, void *buf,
 bool ReliableConnection::postSendSingle(RdmaReq req, uint64_t req_id, void *buf,
                                         uint32_t len, uint32_t lkey,
                                         uintptr_t remote_addr) {
-
   // std::cout << "post send signal" << std::endl;
   // TODO(Kristian): if not used concurrently, we could reuse the same wr
   struct ibv_send_wr wr;
@@ -351,6 +350,27 @@ bool ReliableConnection::postSendSingle(RdmaReq req, uint64_t req_id, void *buf,
       .buf(buf)
       .len(len)
       .lkey(lkey)
+      .remote_addr(remote_addr)
+      .rkey(rconn.rci.rkey)
+      .build(wr, sg);
+
+  return post_send(wr);
+}
+
+bool ReliableConnection::postSendSingleNoSignal(RdmaReq req, uint64_t req_id, void *buf,
+                                        uint32_t len, uintptr_t remote_addr) {
+  // std::cout << "post send signal" << std::endl;
+  // TODO(Kristian): if not used concurrently, we could reuse the same wr
+  struct ibv_send_wr wr;
+  struct ibv_sge sg;
+
+  SendWrBuilder()
+      .req(req)
+      .signaled(false)
+      .req_id(req_id)
+      .buf(buf)
+      .len(len)
+      .lkey(mr.lkey)
       .remote_addr(remote_addr)
       .rkey(rconn.rci.rkey)
       .build(wr, sg);

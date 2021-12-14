@@ -87,7 +87,7 @@ class ReliableConnection {
   enum RdmaReq { RdmaRead = IBV_WR_RDMA_READ, RdmaWrite = IBV_WR_RDMA_WRITE };
 
   // added a zero here
-  static constexpr int WRDepth = 12800;
+  static constexpr int WRDepth = 1280;
   static constexpr int SGEDepth = 16;
   static constexpr int MaxInlining = 256;
   static constexpr uint32_t DefaultPSN = 3185;
@@ -125,6 +125,8 @@ class ReliableConnection {
 
   bool postSendSingle(RdmaReq req, uint64_t req_id, void *buf, uint32_t len,
                       uint32_t lkey, uintptr_t remote_addr);
+
+  bool postSendSingleNoSignal(RdmaReq req, uint64_t req_id, void *buf, uint32_t len, uintptr_t remote_addr);
 
   bool pollCqIsOK(CQ cq, std::vector<struct ibv_wc> &entries);
 

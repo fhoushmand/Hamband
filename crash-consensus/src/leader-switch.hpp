@@ -566,7 +566,7 @@ class LeaderSwitcher {
     // If you discovered a new request for a leader, notify the main event loop
     // to give permissions to him and switch to follower.
     if (requester > 0) {
-      std::cout << "index: " << leader_start_index.load() << std::endl;
+      // std::cout << "index: " << leader_start_index.load() << std::endl;
       std::cout << "Process with pid " << requester
                 << " asked for permissions" << std::endl;
       leader.store(dory::Leader(requester, reading[requester], force_reset));
