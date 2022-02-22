@@ -29,9 +29,12 @@ public:
     
  
     GSet() {
-      num_methods = 2;
-      read_method = 1;
+      read_methods.push_back(static_cast<int>(MethodType::QUERY));
+
       update_methods.push_back(static_cast<int>(MethodType::ADD));
+      
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::ADD), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::QUERY), 0));
     }
 
     GSet(GSet &obj) : ReplicatedObject(obj)

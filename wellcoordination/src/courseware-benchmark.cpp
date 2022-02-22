@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     test->registerStudent(std::to_string(i));
     test->addCourse(std::to_string(i));
   }
-  MethodCallFactory factory = MethodCallFactory(test, nr_procs);
+  // MethodCallFactory factory = MethodCallFactory(test, nr_procs);
 
   write_percentage /= 100;
   int num_replicas = nr_procs;
@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
             callStr = "2 " + s_id + "-" + c_id;
           }
 
-          MethodCall call = factory.createCall("id", callStr);
+          MethodCall call = ReplicatedObject::createCall("id", callStr);
           if (test->isPermissible(call)) {
             test->execute(call);
             calls[i - 1].push_back(callStr);
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
         std::string s_id = std::to_string(std::rand() % 1000);
         callStr = "3 " + s_id;
 
-        MethodCall call = factory.createCall("id", callStr);
+        MethodCall call = ReplicatedObject::createCall("id", callStr);
         test->execute(call);
         calls[i - 1].push_back(callStr);
       }

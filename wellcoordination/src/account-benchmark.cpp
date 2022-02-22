@@ -4,7 +4,7 @@
 #include <string>
 #include <thread>
 
-#include "bank_account.hpp"
+#include "account.hpp"
 
 int main(int argc, char* argv[]) {
   std::string loc =
@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
   }
 
   BankAccount* test = new BankAccount(100000);
-  MethodCallFactory factory = MethodCallFactory(test, nr_procs);
+  // MethodCallFactory factory = MethodCallFactory(test, nr_procs);
 
   write_percentage /= 100;
   int num_replicas = nr_procs;
@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
             callStr = "0 " + c_id;
           }
 
-          MethodCall call = factory.createCall("id", callStr);
+          MethodCall call = ReplicatedObject::createCall("id", callStr);
           if (test->isPermissible(call)) {
             test->execute(call);
             calls[i - 1].push_back(callStr);
@@ -96,7 +96,6 @@ int main(int argc, char* argv[]) {
           }
         }
       }
-      std::cout << count << std::endl;
     }
     // follower
     else {
@@ -108,7 +107,7 @@ int main(int argc, char* argv[]) {
         std::string s_id = std::to_string(std::rand() % 20);
         callStr = "1 " + s_id;
 
-        MethodCall call = factory.createCall("id", callStr);
+        MethodCall call = ReplicatedObject::createCall("id", callStr);
         test->execute(call);
         calls[i - 1].push_back(callStr);
       }

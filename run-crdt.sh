@@ -50,7 +50,7 @@ for n in $( seq 3 7 ); do
                 
                         for i in $( seq 1 $n ); do
                                 #printf "ssh ${nodes[$i]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./crash-consensus/demo/using_conan_fully/build/bin/main-st $i 4096 1 > $i.log'"
-                                #ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./wellcoordination/build/bin/hamsaz 2 $i 10000 10 > $i.log&"
+                                #ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./wellcoordination/build/bin/band 2 $i 10000 10 > $i.log&"
                                 printf "ssh ${nodes[$i]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./wellcoordination/build/bin/$MODE $i $n $NUM_OPS $p $USECASE > $RESULT_LOC$n-$NUM_OPS-$p/$USECASE/results/$MODE-$i-$r.log'\n";
                                 ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; numactl --membind 0 ./wellcoordination/build/bin/$MODE $i $n $NUM_OPS $p $USECASE > $RESULT_LOC$n-$NUM_OPS-$p/$USECASE/results/$MODE-$i-$r.log&";
                         done

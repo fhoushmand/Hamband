@@ -3,9 +3,9 @@
 // // using namespace dory;
 // using namespace hamsaz;
 
-// void read(BE_Broadcast& sender);
+// void read(ReliableBroadcast& sender);
 
-// void read(BE_Broadcast& sender)
+// void read(ReliableBroadcast& sender)
 // {
 //   // reading (remote and local)
 //   while (true) {
@@ -76,7 +76,7 @@
 //     }
 //   }
 //   // std::string payload;
-//   BE_Broadcast* beb_instance = new BE_Broadcast(id, remote_ids);
+//   ReliableBroadcast* beb_instance = new ReliableBroadcast(id, remote_ids);
 //   std::cout << "Waiting (5 sec) for all processes to fetch the connections" << std::endl;
 //         std::this_thread::sleep_for(std::chrono::seconds(5));
         

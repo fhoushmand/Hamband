@@ -9,53 +9,41 @@ class Mu : Synchronizer {
   //  private:
  public:
   // common in all the use-cases
-  int self;
   size_t num_process;
   std::vector<int> remote_ids;
   uint64_t req_id = 0;
-  std::unique_ptr<dory::Consensus> synchSenders;
-  MethodCallFactory callFactory;
+  std::unique_ptr<dory::Consensus> tob;
   uint64_t throughput_end;
-  std::atomic<int>** calls_applied;
-  uint64_t readDelay = 0;
-
   ReplicatedObject* repl_object;
 
   ~Mu() {}
 
   Mu(int id, std::vector<int> r_ids, ReplicatedObject* obj) {
-    self = id;
     remote_ids = r_ids;
     num_process = remote_ids.size() + 1;
     repl_object = obj;
-    callFactory = MethodCallFactory(repl_object, num_process);
-    calls_applied = new std::atomic<int>*[repl_object->num_methods];
-    for (int i = 0; i < repl_object->num_methods; i++)
-      calls_applied[i] = new std::atomic<int>[num_process];
-    for (int x = 0; x < repl_object->num_methods; x++)
-      for (size_t i = 0; i < num_process; i++) calls_applied[x][i] = 0;
     
-    synchSenders = std::make_unique<dory::Consensus>(id, remote_ids, 8,
+    tob = std::make_unique<dory::Consensus>(id, remote_ids, 8,
                                                      dory::ThreadBank::A);
 
     // this is only called in the followers
     // in the leader, after proposal we directly call response
     // since we know that it can be delivered to the leader right away
     // ie., call to the handler and return of the propose method are equivalent
-    synchSenders->commitHandler([&]([[maybe_unused]] bool leader,
+    tob->commitHandler([&]([[maybe_unused]] bool leader,
                                     [[maybe_unused]] uint8_t* buf,
                                     [[maybe_unused]] size_t len) {
-      MethodCall* response = callFactory.deserialize(buf);
+      MethodCall* response = repl_object->deserialize(buf);
       // std::cout << "received call" << std::endl;
-      repl_object->execute(*response);
-      calls_applied[response->method_type][0]++;
+      repl_object->internalExecute(*response, 0);
+      // calls_applied[response->method_type][0]++;
     });
   }
 
    virtual std::pair<ResponseStatus,std::chrono::high_resolution_clock::time_point> request(MethodCall request, bool debug, bool summarize) {
     // a query method
     // handle localy and do not propagate
-    if (request.method_type == repl_object->read_method) 
+    if (std::find(repl_object->read_methods.begin(), repl_object->read_methods.end(), request.method_type) != repl_object->read_methods.end()) 
       return response(request, ResponseStatus::NoError, false);
 
     
@@ -67,11 +55,11 @@ class Mu : Synchronizer {
       return response(request, ResponseStatus::NotPermissible, debug);
     }
     // serialize the call
-    auto length = callFactory.serialize(request, payload);
+    auto length = repl_object->serialize(request, payload);
     payload_buffer.resize(length);
     // propose the call to others
     dory::ProposeError err =
-        synchSenders->propose(payload, payload_buffer.size());
+        tob->propose(payload, payload_buffer.size());
 
     if (err != dory::ProposeError::NoError) {
       // request dropping, erasing it...
@@ -97,7 +85,7 @@ class Mu : Synchronizer {
         case dory::ProposeError::MutexUnavailable:
         case dory::ProposeError::FollowerMode:
           // std::cout << "Error: in follower mode. Potential leader: "
-          //           << synchSenders->potentialLeader() << std::endl;
+          //           << tob->potentialLeader() << std::endl;
           break;
 
         default:

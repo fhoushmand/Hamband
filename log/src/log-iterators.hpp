@@ -20,6 +20,8 @@ class PartitionedIterator {
 
   inline uint8_t* location(size_t partition) { return entry_ptrs[partition]; }
 
+  inline ptrdiff_t offset(size_t partition) { return partition * part_length + 1024; }
+
  private:
   uint8_t* base_ptr;
   ptrdiff_t part_length;

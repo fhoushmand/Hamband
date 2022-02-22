@@ -27,13 +27,16 @@ public:
 
     std::unordered_map<int,int> multiset;
     
-    
  
     Shop() {
-      num_methods = 3;
-      read_method = 2;
+      read_methods.push_back(static_cast<int>(MethodType::QUERY));
+
       update_methods.push_back(static_cast<int>(MethodType::ADD));
       update_methods.push_back(static_cast<int>(MethodType::REMOVE));
+
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::ADD), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::REMOVE), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::QUERY), 0));
     }
 
     Shop(Shop &obj) : ReplicatedObject(obj)

@@ -13,13 +13,6 @@
 
 typedef unsigned char uint8_t;
 
-struct pair_hash {
-    inline std::size_t operator()(const std::pair<std::string,std::string> & v) const {
-        std::hash<std::string> hasher;
-        return hasher(v.first)*31+hasher(v.second);
-    }
-};
-
 class Courseware : public ReplicatedObject
 {
 private:
@@ -38,26 +31,34 @@ public:
     std::unordered_set<std::string> courses;
     std::unordered_set<std::pair<std::string,std::string>, pair_hash> enrollments;
     
-    std::recursive_mutex ss_lock;  
+    // std::recursive_mutex ss_lock;  
  
     Courseware() {
-      num_methods = 5;
-      read_method = 4;
+      read_methods.push_back(static_cast<int>(MethodType::QUERY));
+
+      update_methods.push_back(static_cast<int>(MethodType::ADD_COURSE));
+      update_methods.push_back(static_cast<int>(MethodType::DELETE_COURSE));
+      update_methods.push_back(static_cast<int>(MethodType::ENROLL));
+      update_methods.push_back(static_cast<int>(MethodType::ADD_STUDENT));
+
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::ADD_COURSE), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::DELETE_COURSE), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::ENROLL), 2));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::ADD_STUDENT), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::QUERY), 0));
+
+      // conflicts
       std::vector<int> g1;
       g1.push_back(static_cast<int>(MethodType::ADD_COURSE));
       g1.push_back(static_cast<int>(MethodType::DELETE_COURSE));
       g1.push_back(static_cast<int>(MethodType::ENROLL));
       synch_groups.push_back(g1);
       
+      // dependencies
       std::vector<int> d1;
       d1.push_back(static_cast<int>(MethodType::ADD_COURSE));
       d1.push_back(static_cast<int>(MethodType::ADD_STUDENT));
       dependency_relation.insert(std::make_pair(static_cast<int>(MethodType::ENROLL), d1));
-
-      update_methods.push_back(static_cast<int>(MethodType::ADD_COURSE));
-      update_methods.push_back(static_cast<int>(MethodType::DELETE_COURSE));
-      update_methods.push_back(static_cast<int>(MethodType::ENROLL));
-      update_methods.push_back(static_cast<int>(MethodType::ADD_STUDENT));
     }
 
     // Courseware(const Courseware&) = delete;
@@ -142,7 +143,7 @@ public:
       }
       case MethodType::ADD_STUDENT:
       {
-        const std::lock_guard<std::recursive_mutex> lock_ss(ss_lock);
+        // const std::lock_guard<std::recursive_mutex> lock_ss(ss_lock);
         registerStudent(call.arg);
         break;
       }
@@ -179,7 +180,7 @@ public:
           size_t index = call.arg.find_first_of('-');
           std::string s = call.arg.substr(0, index);
           std::string c = call.arg.substr(index + 1, call.arg.length());
-          const std::lock_guard<std::recursive_mutex> lock_ss(ss_lock);
+          // const std::lock_guard<std::recursive_mutex> lock_ss(ss_lock);
           if(students.find(s) == students.end() || courses.find(c) == courses.end())
             return false;
           return true;

@@ -120,7 +120,7 @@ std::vector<uint8_t> Log::dump() const {
 
 // Log for non-conflicting operations added by FARZIN
 
-HamsazLog::HamsazLog(void *underlying_buf, size_t buf_len, size_t num_partitions)
+BandLog::BandLog(void *underlying_buf, size_t buf_len, size_t num_partitions)
     : buf{reinterpret_cast<uint8_t *>(underlying_buf)}, len{buf_len}, num_partitions{num_partitions} {
   static_assert(LogConfig::is_powerof2(LogConfig::Alignment),
                 "should use a power of 2 as template parameter");
@@ -146,7 +146,7 @@ HamsazLog::HamsazLog(void *underlying_buf, size_t buf_len, size_t num_partitions
 }
 
 
-HamsazLog::CallEntry HamsazLog::newCallEntry(uint64_t offset, bool override) {
+BandLog::CallEntry BandLog::newCallEntry(uint64_t offset, bool override) {
   // std::cout << "Adding entry with absolute offset " << len -
   // header->free_bytes << std::endl;
   if(override)
@@ -155,12 +155,12 @@ HamsazLog::CallEntry HamsazLog::newCallEntry(uint64_t offset, bool override) {
     return CallEntry(offset + buf + len - free_bytes, free_bytes);
 }
 
-void HamsazLog::finalizeCallEntry(CallEntry &call) {
+void BandLog::finalizeCallEntry(CallEntry &call) {
   auto bytes_used = call.finalize();
   free_bytes -= LogConfig::round_up_powerof2(bytes_used);
 }
 
-std::vector<uint8_t> HamsazLog::dump() const {
+std::vector<uint8_t> BandLog::dump() const {
   std::vector<uint8_t> v;
 
   for (size_t i = 0; i < len; i++) {

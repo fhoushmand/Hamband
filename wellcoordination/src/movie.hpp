@@ -31,23 +31,28 @@ public:
     
  
     Movie() {
-      num_methods = 5;
-      read_method = 4;
-
-      std::vector<int> g1;
-      g1.push_back(static_cast<int>(MethodType::ADD_MOVIE));
-      g1.push_back(static_cast<int>(MethodType::REMOVE_MOVIE));
-      synch_groups.push_back(g1);
-
-      std::vector<int> g2;
-      g2.push_back(static_cast<int>(MethodType::ADD_CUSTOMER));
-      g2.push_back(static_cast<int>(MethodType::REMOVE_CUSTOMER));
-      synch_groups.push_back(g2);
+      read_methods.push_back(static_cast<int>(MethodType::QUERY));
 
       update_methods.push_back(static_cast<int>(MethodType::ADD_MOVIE));
       update_methods.push_back(static_cast<int>(MethodType::REMOVE_MOVIE));
       update_methods.push_back(static_cast<int>(MethodType::ADD_CUSTOMER));
       update_methods.push_back(static_cast<int>(MethodType::REMOVE_CUSTOMER));
+
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::ADD_MOVIE), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::REMOVE_MOVIE), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::ADD_CUSTOMER), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::REMOVE_CUSTOMER), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::QUERY), 0));
+
+      // conflicts
+      std::vector<int> g1;
+      g1.push_back(static_cast<int>(MethodType::ADD_MOVIE));
+      g1.push_back(static_cast<int>(MethodType::REMOVE_MOVIE));
+      synch_groups.push_back(g1);
+      std::vector<int> g2;
+      g2.push_back(static_cast<int>(MethodType::ADD_CUSTOMER));
+      g2.push_back(static_cast<int>(MethodType::REMOVE_CUSTOMER));
+      synch_groups.push_back(g2);
     }
 
     Movie(Movie &obj) : ReplicatedObject(obj)

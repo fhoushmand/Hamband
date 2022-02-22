@@ -9,28 +9,14 @@
 #include "mu.hpp"
 
 #include "courseware.hpp"
-#include "bank_account.hpp"
+#include "project.hpp"
+#include "account.hpp"
 #include "counter.hpp"
 #include "gset.hpp"
 #include "movie.hpp"
 #include "register.hpp"
-#include "cart.hpp"
+#include "orset.hpp"
 #include "shop.hpp"
-
-MethodCall createCall(std::string id, std::string call);
-
-MethodCall createCall(std::string id, std::string call) {
-  int method_type;
-  size_t spaceIndex = call.find_first_of(' ');
-  if (spaceIndex == std::string::npos)
-    method_type = std::stoi(call);
-  else
-    method_type = std::stoi(call.substr(0, spaceIndex));
-
-  std::string arg = call.substr(spaceIndex + 1, call.size());
-
-  return MethodCall(id, method_type, arg);
-}
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -78,9 +64,9 @@ int main(int argc, char* argv[]) {
   {
     object = new Register();
   }
-  else if(usecase == "cart")
+  else if(usecase == "orset")
   {
-    object = new Cart();
+    object = new ORSet();
   }
   else if(usecase == "shop")
   {
@@ -99,6 +85,14 @@ int main(int argc, char* argv[]) {
       static_cast<Courseware*>(object)->addCourse(std::to_string(i));
     }
   }
+  else if (usecase == "project") {
+    object = new Project();
+    // init object
+    for (int i = 0; i < 1000; i++) {
+      static_cast<Project*>(object)->addEmployee(std::to_string(i));
+      static_cast<Project*>(object)->addProject(std::to_string(i));
+    }
+  }
   else if(usecase == "account")
   {
     object = new BankAccount(100000);
@@ -107,10 +101,11 @@ int main(int argc, char* argv[]) {
   {
     object = new Movie();
   }
+  object->setID(id)->setNumProcess(nr_procs)->finalize();
   // no need to track deps while using mu
   object->dependency_relation.clear();
 
-  MethodCallFactory callFactory = MethodCallFactory(object, nr_procs);
+  // MethodCallFactory callFactory = MethodCallFactory(object, nr_procs);
   std::unordered_map<std::string, uint64_t>* response_times =
       new std::unordered_map<std::string, uint64_t>[object->num_methods];
   for (int i = 0; i < object->num_methods; i++)
@@ -134,12 +129,12 @@ int main(int argc, char* argv[]) {
     leaderChange = std::thread([&] {
       while (true) {
         if (own_requests_done.load() &&
-        protocol.synchSenders->amILeader()) {
+        protocol.tob->amILeader()) {
           std::cout << "started sending remaining leader messages" << std::endl; 
           while (getline(leader_requests, l)) {
             std::string sequence_number =
             std::to_string(id) + "-" + std::to_string(call_id++);
-            MethodCall call = createCall(sequence_number, l);
+            MethodCall call = ReplicatedObject::createCall(sequence_number, l);
             if (protocol.request(call, false, false).first == ResponseStatus::NoError) new_sent++;
           }
           std::cout << "finished sending" << std::endl;
@@ -160,7 +155,7 @@ int main(int argc, char* argv[]) {
           while (getline(follower_requests, l)) {
             std::string sequence_number =
             std::to_string(id) + "-" + std::to_string(call_id++);
-            MethodCall call = createCall(sequence_number, l);
+            MethodCall call = ReplicatedObject::createCall(sequence_number, l);
             if (protocol.request(call, false, false).first == ResponseStatus::NoError) new_sent++;
           }
           std::cout << "finished sending" << std::endl;
@@ -195,7 +190,6 @@ int main(int argc, char* argv[]) {
     if (id != 1 && id != i) continue;
     std::string line;
     std::ifstream myfile;
-    std::cout << "reading from file " << i << std::endl;
     myfile.open((loc + std::to_string(i) + ".txt").c_str());
     // start reading from the request file
     while (getline(myfile, line)) {
@@ -206,15 +200,17 @@ int main(int argc, char* argv[]) {
       // failure
       if (unlikely(line.at(0) == 'X')) {
         std::cout << "stoping heartbeat thread and waiting..." << std::endl;
-        protocol.synchSenders->stopHeartbeatThread();
+        protocol.tob->stopHeartbeatThread();
         break;
       }
       
       std::string sequence_number =
           std::to_string(id) + "-" + std::to_string(call_id++);
-      MethodCall call = createCall(sequence_number, line);      
+      MethodCall call = ReplicatedObject::createCall(sequence_number, line);      
       // don't do reads of others if you are the leader
-      if(id == 1 && i != 1 && call.method_type == object->read_method) continue;
+      if(id == 1 && i != 1 && 
+                  std::find(object->read_methods.begin(), object->read_methods.end(), call.method_type) != object->read_methods.end())
+        continue;
 
       // calculating the response time
       if(!calculate_throughput){
@@ -257,30 +253,28 @@ int main(int argc, char* argv[]) {
     }
   }
 
-//   std::cout << "local_throughput_time: "
-//             << local_end - local_start << std::endl;
-
 	if(id == 1){
   	std::cout << "throughput: "
     	        << static_cast<double>(num_ops)/static_cast<double>(local_end - local_start) << std::endl;
-  	object->toString();
 	}
 
-  double sum = 0;
-  double total_sum = 0;
-  size_t num = 0;
-  for (int i = 0; i < object->num_methods; i++) {
-    total_sum += sum;
-    sum = 0;
-    for (auto& pair : response_times[i])
-      sum += static_cast<double>(pair.second);
-		num += response_times[i].size();
-    std::cout << "average response time for " << response_times[i].size()
-              << " calls to " << i << ": "
-              << (sum/1000) / static_cast<int>(response_times[i].size()) << std::endl;
+  if(!calculate_throughput){
+    double sum = 0;
+    double total_sum = 0;
+    size_t num = 0;
+    for (int i = 0; i < object->num_methods; i++) {
+      total_sum += sum;
+      sum = 0;
+      for (auto& pair : response_times[i])
+        sum += static_cast<double>(pair.second);
+      num += response_times[i].size();
+      std::cout << "average response time for " << response_times[i].size()
+                << " calls to " << i << ": "
+                << (sum/1000) / static_cast<int>(response_times[i].size()) << std::endl;
+    }
+    std::cout << "total average response time for " << num
+              << " calls: " << (total_sum/1000) / static_cast<int>(num) << std::endl;
   }
-  std::cout << "total average response time for " << num
-            << " calls: " << (total_sum/1000) / static_cast<int>(num) << std::endl;
 	
   std::this_thread::sleep_for(std::chrono::seconds(60));
   return 0;

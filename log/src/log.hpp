@@ -102,8 +102,8 @@ class ParsedCall {
 };
 
 
-// Log for non-conflicting calls(wellcoordination -> Hamsaz) added by FARZIN 
-class HamsazLog {
+// Log for non-conflicting calls(wellcoordination -> Band) added by FARZIN 
+class BandLog {
  public:
   class CallEntry {
    public:
@@ -146,22 +146,22 @@ class HamsazLog {
     uint64_t len;
   };
 
-  HamsazLog(void* underlying_buf, size_t buf_len, size_t num_partitions);
+  BandLog(void* underlying_buf, size_t buf_len, size_t num_partitions);
 
   // Copy constructor
-  HamsazLog(HamsazLog const& other) = delete;
+  BandLog(BandLog const& other) = delete;
 
   // Copy assignment operator
-  HamsazLog& operator=(HamsazLog const& other) = delete;
+  BandLog& operator=(BandLog const& other) = delete;
 
   // Move constructor
-  HamsazLog(HamsazLog&& other) = delete;
+  BandLog(BandLog&& other) = delete;
 
   // Move assignment operator
-  HamsazLog& operator=(HamsazLog&& other) = delete;
+  BandLog& operator=(BandLog&& other) = delete;
 
   // Destructor
-  ~HamsazLog() = default;
+  ~BandLog() = default;
 
   CallEntry newCallEntry(uint64_t offset, bool override);
   void finalizeCallEntry(CallEntry& call);
@@ -553,7 +553,7 @@ class Slot {
 
 class Call {
  public:
-  Call(HamsazLog& log, uint64_t log_offset, uint8_t* buf, size_t buf_len, bool override)
+  Call(BandLog& log, uint64_t log_offset, uint8_t* buf, size_t buf_len, bool override)
       : log{log}, log_offset{log_offset}  {
     call = log.newCallEntry(log_offset, override);
     call.store_buf(buf, buf_len);
@@ -577,9 +577,9 @@ class Call {
   }
 
  private:
-  HamsazLog& log;
+  BandLog& log;
   uint64_t log_offset;
-  HamsazLog::CallEntry call;
+  BandLog::CallEntry call;
   int seq;
 };
 

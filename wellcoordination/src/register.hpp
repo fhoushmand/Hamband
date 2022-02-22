@@ -30,9 +30,13 @@ public:
  
     Register() {
       reg = 0;
-      num_methods = 2;
-      read_method = 1;
+
+      read_methods.push_back(static_cast<int>(MethodType::QUERY));
+
       update_methods.push_back(static_cast<int>(MethodType::WRITE));
+
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::WRITE), 1));
+      method_args.insert(std::make_pair(static_cast<int>(MethodType::QUERY), 0));
     }
 
     Register(Register &obj) : ReplicatedObject(obj)

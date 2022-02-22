@@ -1,0 +1,2 @@
+execute 'memcached -vv -p 9999 on the memcached server node'
+execute 'export DORY_REGISTRY_IP={memcached server ip}:9999'

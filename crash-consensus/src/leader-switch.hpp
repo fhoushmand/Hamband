@@ -247,7 +247,7 @@ class LeaderHeartbeat {
   int leader_pid(int start_index) {
     int leader_id = -1;
 
-    for (int i = 0; i < static_cast<int>(ids.size()); i++) {
+    for (int i = start_index; i < static_cast<int>(ids.size()); i++) {
       int pid = ids[i];
       // std::cout << pid << " " << status[pid].consecutive_updates <<
       // std::endl;
@@ -537,7 +537,6 @@ class LeaderSwitcher {
         want_leader{&heartbeat->wantLeaderSignal()},
         read_slots{ctx->scratchpad.writeLeaderChangeSlots()},
         sz{read_slots.size()},
-        // leader_start_index{(heartbeat->start_id == 0 ? 0 : heartbeat->start_id + 1)},
         permission_asker{ctx} {
     leader_start_index.store((heartbeat->start_id.load() == 0 ? 0 : heartbeat->start_id.load() + 1));
     std::cout << "inside leaderswitcher constructor: " << leader_start_index << std::endl;
@@ -981,7 +980,6 @@ class LeaderElection {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         // ADDED FARZIN
-        // std::cout << "checking exit" << std::endl;
           if (ftr.wait_for(std::chrono::seconds(0)) ==
               std::future_status::ready) {
             std::cout << "exiting heartbeat..." << std::endl;

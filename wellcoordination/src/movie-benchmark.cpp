@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
   Movie* test = new Movie();
 
-  MethodCallFactory factory = MethodCallFactory(test, nr_procs);
+  // MethodCallFactory factory = MethodCallFactory(test, nr_procs);
 
   write_percentage /= 100;
   int num_replicas = nr_procs;
@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
             std::string c_id = std::to_string(1001 + std::rand() % 100);
             callStr = "1 " + c_id;
           }
-          MethodCall call = factory.createCall("id", callStr);
+          MethodCall call = ReplicatedObject::createCall("id", callStr);
           if (test->isPermissible(call)) {
             test->execute(call);
             calls[i - 1].push_back(callStr);
@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
             std::string c_id = std::to_string(1001 + std::rand() % 100);
             callStr = "3 " + c_id;
           }
-          MethodCall call = factory.createCall("id", callStr);
+          MethodCall call = ReplicatedObject::createCall("id", callStr);
           if (test->isPermissible(call)) {
             test->execute(call);
             calls[i - 1].push_back(callStr);
@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
       //   std::string s_id = std::to_string(std::rand() % 1000);
       //   callStr = "3 " + s_id;
 
-      //   MethodCall call = factory.createCall("id", callStr);
+      //   MethodCall call = ReplicatedObject::createCall("id", callStr);
       //   test->execute(call);
       //   calls[i - 1].push_back(callStr);
       // }

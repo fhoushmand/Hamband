@@ -15,3 +15,6 @@ Right now, I only lock students relation for checking the permissibility of enro
 5) Almost .7 microseconds speedup in response time when doing polling with 1000 batch for bank and courseware.
 However, some writes are missing!
 
+6) For multi synch groups make sure to set memory to more that 12GB per node.
+6) For multi synch groups make sure to increase the time in the script.
+

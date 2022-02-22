@@ -1,11 +1,12 @@
 #include <thread>
 #include "beb.hpp"
+#include "account.hpp"
 using namespace dory;
-using namespace hamsaz;
+using namespace band;
 
-void read(BE_Broadcast& sender, size_t i);
+void read(ReliableBroadcast& sender, size_t i);
 
-void read(BE_Broadcast& sender, size_t i) {
+void read(ReliableBroadcast& sender, size_t i) {
   while (sender.partIter.hasNext(i)) {
     ParsedCall pslot = ParsedCall(sender.partIter.location(i));
     auto [buf, len] = pslot.payload();
@@ -55,43 +56,34 @@ int main(int argc, char* argv[]) {
       remote_ids.push_back(i);
     }
   }
-  // std::string payload;
-  BE_Broadcast* beb_instance = new BE_Broadcast(id, remote_ids);
-  std::cout << "Waiting (5 sec) for all processes to fetch the connections"
+
+  ReplicatedObject* object = new BankAccount(100000);
+  object->setID(id)->setNumProcess(nr_procs)->finalize();
+  object->dependency_relation.clear();
+
+  ReliableBroadcast* beb_instance = new ReliableBroadcast(id, remote_ids, object);
+  std::cout << "Waiting..."
             << std::endl;
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
-  std::vector<uint8_t> payload_buffer(8 + 2);
+  std::vector<uint8_t> payload_buffer(256);
   uint8_t* payload = &payload_buffer[0];
   for (int i = 0; i < 1; i++) {
+    MethodCall c;
+    std::string sequence_number =
+            std::to_string(id) + "-" + std::to_string(i);
     if (id == 1)
-      strcpy(reinterpret_cast<char*>(const_cast<uint8_t*>(payload)), "1-");
+      c = ReplicatedObject::createCall(sequence_number, "1 " + std::to_string(10 + i));
     else if (id == 2)
-      strcpy(reinterpret_cast<char*>(const_cast<uint8_t*>(payload)), "2-");
+      c = ReplicatedObject::createCall(sequence_number, "1 " + std::to_string(20 + i));
     else
-      strcpy(reinterpret_cast<char*>(const_cast<uint8_t*>(payload)), "3-");
-    if(id == 1)
-      beb_instance->broadcastCall(payload, 10, true);
+      c = ReplicatedObject::createCall(sequence_number, "1 " + std::to_string(30 + i));
+    size_t s = object->serialize(c, payload);
+    payload_buffer.resize(s);
+    beb_instance->broadcast(payload, s, false);
   }
-
-  if(id == 2 || id == 3){
-    std::vector<uint8_t> payload_buffer2(100);
-    uint8_t* local_memory = &payload_buffer2[0];
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    beb_instance->ce->connections().at(1).postSendSingle(
-            ReliableConnection::RdmaRead,
-            quorum::pack(quorum::EntryRd, id, 10),
-            local_memory,
-            100, 
-            beb_instance->ce->connections().at(1).remoteBuf());
-    beb_instance->pollCQ();
-    std::cout << "reread: " << local_memory << std::endl;
-  }
-
   
-  std::thread reader([&beb_instance] { read(*beb_instance, 0); });
-  reader.join();
-  std::this_thread::sleep_for(std::chrono::seconds(5));
+  std::this_thread::sleep_for(std::chrono::seconds(60));
   std::cout << "end\n";
   return 0;
 }

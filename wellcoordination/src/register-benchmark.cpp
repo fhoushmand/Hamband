@@ -51,7 +51,7 @@ uint64_t dur = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).c
   }
 
   Register* test = new Register();
-  MethodCallFactory factory = MethodCallFactory(test, nr_procs);
+  // MethodCallFactory factory = MethodCallFactory(test, nr_procs);
 
   write_percentage /= 100;
   int num_replicas = nr_procs;
@@ -111,7 +111,7 @@ uint64_t dur = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).c
             callStr = "0 " + c_id;
           }
 
-          MethodCall call = factory.createCall("id", callStr);
+          MethodCall call = ReplicatedObject::createCall("id", callStr);
           if (test->isPermissible(call)) {
             test->execute(call);
             calls[i - 1].push_back(callStr);
@@ -130,7 +130,7 @@ uint64_t dur = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).c
         std::string s_id = std::to_string(std::rand() % 1000);
         callStr = "3 " + s_id;
 
-        MethodCall call = factory.createCall("id", callStr);
+        MethodCall call = ReplicatedObject::createCall("id", callStr);
         test->execute(call);
         calls[i - 1].push_back(callStr);
       }
