@@ -36,11 +36,12 @@ add_executable(
 )
 
 add_executable(
-    test
-    test.cpp
+    band-crdt
+    band-main-crdt.cpp
 )
 
 
 target_link_libraries(band ${CONAN_LIBS} pthread)
+target_link_libraries(band-crdt ${CONAN_LIBS} pthread)
 target_link_libraries(mu ${CONAN_LIBS} pthread)
-target_link_libraries(test ${CONAN_LIBS} pthread)
+#target_link_libraries(test ${CONAN_LIBS} pthread)

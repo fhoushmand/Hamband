@@ -25,17 +25,15 @@ int main(int argc, char* argv[]) {
     outfile[i].open(loc + std::to_string(i + 1) + ".txt", std::ios_base::app);
     calls[i] = std::vector<std::string>();
   }
-
   Counter* test = new Counter();
-  // MethodCallFactory factory = MethodCallFactory(test, nr_procs);
-
+  
   write_percentage /= 100;
   int num_replicas = nr_procs;
   double total_writes = num_ops * write_percentage;
   int queries = num_ops - total_writes;
 
-  int num_conflicting_write_methods = 1;
-  int num_nonconflicting_write_methods = 0;
+  int num_conflicting_write_methods = 0;
+  int num_nonconflicting_write_methods = 1;
   int num_read_methods = 1;
 
   std::cout << "ops: " << num_ops << std::endl;
@@ -55,63 +53,36 @@ int main(int argc, char* argv[]) {
             << expected_calls_per_update_method * num_conflicting_write_methods
             << std::endl;
 
-  int expected_nonconflicting_write_calls_per_follower =
+  int expected_nonconflicting_write_calls_per_node =
       (total_writes -
        expected_calls_per_update_method * num_conflicting_write_methods) /
-      (nr_procs - 1);
+      (nr_procs);
 
-  std::cout << "expected #calls per nonconflicting writes in follower "
-            << expected_nonconflicting_write_calls_per_follower << std::endl;
-  std::cout << "total nonconflicting #calls in followers "
-            << expected_nonconflicting_write_calls_per_follower *
-                   num_nonconflicting_write_methods * (nr_procs - 1)
+  std::cout << "expected #calls per nonconflicting writes in nodes "
+            << expected_nonconflicting_write_calls_per_node << std::endl;
+  std::cout << "total nonconflicting #calls in nodes "
+            << expected_nonconflicting_write_calls_per_node *
+                   num_nonconflicting_write_methods * (nr_procs)
             << std::endl;
 
   int write_calls =
       expected_calls_per_update_method * num_conflicting_write_methods +
-      expected_nonconflicting_write_calls_per_follower *
-          num_nonconflicting_write_methods * (nr_procs - 1);
+      expected_nonconflicting_write_calls_per_node *
+          num_nonconflicting_write_methods * (nr_procs);
 
   // first allocating writes operations to the nodes
   for (int i = 1; i <= num_replicas; i++) {
-    // leader
-    if (i == 1) {
-      // conflicting calls are sent to the leader (first process) -- later this
-      // will change to handeling multiple leaders
-      for (int type = 0; type <= 0; type++) {
-        int count = 0;
-        for (; count < expected_calls_per_update_method;) {
-          std::string callStr;
-          if (type == 0) {
-            std::string c_id = std::to_string(std::rand() % 5);
-            callStr = "0 " + c_id;
-          }
+    // non-conflicting write method
+    for (int count = 0;
+        count < expected_nonconflicting_write_calls_per_node; count++) {
+      std::string callStr;
+      // registerStudent
+      std::string s_id = std::to_string(std::rand() % 5);
+      callStr = "0 " + s_id;
 
-          MethodCall call = ReplicatedObject::createCall("id", callStr);
-          if (test->isPermissible(call)) {
-            test->execute(call);
-            calls[i - 1].push_back(callStr);
-            count++;
-          }
-        }
-      }
-    }
-    // follower
-    else {
-      // non-conflicting write method
-      for (int count = 0;
-           count < expected_nonconflicting_write_calls_per_follower; count++) {
-        std::string callStr;
-        // registerStudent
-        std::string s_id = std::to_string(std::rand() % 1000);
-        callStr = "3 " + s_id;
-
-        MethodCall call = ReplicatedObject::createCall("id", callStr);
-        test->execute(call);
-        calls[i - 1].push_back(callStr);
-      }
-      // for(int i = 0; i < queries/(nr_procs-1); i++)
-      //   calls.push_back(std::string("4"));
+      MethodCall call = ReplicatedObject::createCall("id", callStr);
+      test->execute(call);
+      calls[i - 1].push_back(callStr);
     }
   }
 
@@ -119,7 +90,6 @@ int main(int argc, char* argv[]) {
   int q = num_ops - write_calls;
   std::cout << "q: " << q << std::endl;
 
-  // if(calls[0].size() > calls[1].size())
   int read_calls = q;
   int index = 0;
 
@@ -151,7 +121,6 @@ int main(int argc, char* argv[]) {
     std::random_shuffle(calls[i].begin() + 1, calls[i].end());
   }
 
-  //   // outfile.open(loc + std::to_string(i) + ".txt", std::ios_base::app);
   for (int i = 0; i < nr_procs; i++) {
     for (int x = 0; x < calls[i].size(); x++)
       outfile[i] << calls[i][x] << std::endl;

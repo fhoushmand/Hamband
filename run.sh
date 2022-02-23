@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --nodes=5
-#SBATCH --ntasks=5
+#SBATCH --nodes=8
+#SBATCH --ntasks=8
 #SBATCH --cpus-per-task=8
 #SBATCH --output="result.log"
 #SBATCH --mem=15G
@@ -24,6 +24,12 @@ REP=$5 # number of reps
 USECASE=$6 # name of the usecase: project, courseware, movie, gset, counter
 THROUGHPUT=$7 # 1 to calculate throughput, 0 to calculate response times
 FAILURE=$8 # 0 for no failure, 1 for follower and 2 for leader failure
+
+EXECUTION="response"
+if [ "$THROUGHPUT" -eq 1 ]; then
+    EXECUTION="throughput"
+fi
+
 
 
 if [ "$#" -ne 6 ]; then
@@ -52,8 +58,8 @@ mkdir -p $BENCH_DIRECTORY/$RESULTS_DIR_NAME;
                 sleep 2;
               
                 for i in $( seq 1 $NUM_NODES ); do
-                        printf "ssh ${nodes[$i]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./wellcoordination/build/bin/$MODE $i $NUM_NODES $NUM_OPS $WRITE_PERC $USECASE $THROUGHPUT $FAILURE > $RESULT_LOC$NUM_NODES-$NUM_OPS-$WRITE_PERC/$USECASE/$RESULTS_DIR_NAME/$MODE-$i-$r-$THROUGHPUT.log'\n";
-                        ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./wellcoordination/build/bin/$MODE $i $NUM_NODES $NUM_OPS $WRITE_PERC $USECASE $THROUGHPUT $FAILURE > $RESULT_LOC$NUM_NODES-$NUM_OPS-$WRITE_PERC/$USECASE/$RESULTS_DIR_NAME/$MODE-$i-$r-$THROUGHPUT.log&";
+                        printf "ssh ${nodes[$i]}.ib.hpcc.ucr.edu 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./wellcoordination/build/bin/$MODE $i $NUM_NODES $NUM_OPS $WRITE_PERC $USECASE $THROUGHPUT $FAILURE > $RESULT_LOC$NUM_NODES-$NUM_OPS-$WRITE_PERC/$USECASE/$RESULTS_DIR_NAME/$MODE-$i-$r-$EXECUTION.log'\n";
+                        ssh ${nodes[$i]}.ib.hpcc.ucr.edu "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${nodes[0]}:9999; ./wellcoordination/build/bin/$MODE $i $NUM_NODES $NUM_OPS $WRITE_PERC $USECASE $THROUGHPUT $FAILURE > $RESULT_LOC$NUM_NODES-$NUM_OPS-$WRITE_PERC/$USECASE/$RESULTS_DIR_NAME/$MODE-$i-$r-$EXECUTION.log&";
                 done
                 sleep 100;
                 ssh ${nodes[0]}.ib.hpcc.ucr.edu "bash -s" <./kill-memcached.sh

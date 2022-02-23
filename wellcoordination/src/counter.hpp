@@ -24,7 +24,7 @@ public:
       QUERY = 1
     };
 
-    int counter;
+    std::atomic<int> counter;
     
     
  
@@ -41,7 +41,7 @@ public:
     Counter(Counter &obj) : ReplicatedObject(obj)
     {
       //state
-      counter = obj.counter;
+      this->counter = obj.counter.load();
     }
 
     virtual void toString()
