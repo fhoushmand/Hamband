@@ -20,12 +20,13 @@
 
 */
 struct MethodCall {
-  // public
   std::string id;
-  // std::string call;
   int method_type;
-  // std::string method_name;
   std::string arg;
+
+  std::vector<uint8_t> payload_buffer;
+  uint8_t* payload;
+  size_t length;
 
   int** dependency_vectors;
 
@@ -38,6 +39,8 @@ struct MethodCall {
     this->id = id;
     this->method_type = method_type;
     this->arg = arg;
+    // payload_buffer.resize(256);
+    // payload = &payload_buffer[0];
   }
 
   void setDependencies(int** dependencies) { this->dependency_vectors = dependencies; }
@@ -109,11 +112,6 @@ class ReplicatedObject {
     calls_applied[call.method_type][origin]++;
   }
 
-  void internalExecuteCRDT(MethodCall call, size_t origin){
-    execute(call);
-    calls_applied_crdt[call.method_type][origin]++;
-  }
-
   int getSynchGroup(int method_type){
     for (size_t i = 0; i < synch_groups.size(); i++){
       if(std::find(synch_groups[i].begin(), synch_groups[i].end(), method_type) != synch_groups[i].end())
@@ -132,13 +130,16 @@ class ReplicatedObject {
 
     std::string arg = call.substr(spaceIndex + 1, call.size());
 
-    return MethodCall(id, method_type, arg);
+    MethodCall c = MethodCall(id, method_type, arg);
+    return c;
   }
 
+  std::string toString(MethodCall call) {
+    return "(" + call.id + ")" + ":" + std::to_string(call.method_type) + " " + call.arg;
+  }
 
   void printCall(MethodCall call) {
     std::cout << "(" << call.id << ")" << ":" << call.method_type << " " << call.arg << std::endl;
-    
     for (size_t x = 0; x < dependency_relation[call.method_type].size(); x++) {
       std::cout << dependency_relation[call.method_type][x] << " = {";
       for (size_t i = 0; i < num_process; i++)
@@ -207,47 +208,7 @@ class ReplicatedObject {
   }
 
 
-  size_t serializeCRDT(MethodCall call, uint8_t* buffer) {
-    std::vector<uint8_t> idVector(call.id.begin(), call.id.end());
-    uint8_t* id_bytes = &idVector[0];
-    uint64_t id_len = idVector.size();
-
-    std::vector<uint8_t> argVector(call.arg.begin(), call.arg.end());
-    uint8_t* arg_bytes = &argVector[0];
-    uint64_t arg_len = argVector.size();
-
-
-    uint8_t* start = buffer + sizeof(uint64_t);
-    auto temp = start;
-
-    *reinterpret_cast<uint64_t*>(start) = id_len;
-    start += sizeof(id_len);
-
-    *reinterpret_cast<uint64_t*>(start) = arg_len;
-    start += sizeof(arg_len);
-
-    *reinterpret_cast<int*>(start) = call.method_type;
-    start += sizeof(call.method_type);
-
-    memcpy(start, id_bytes, id_len);
-    start += id_len;
-
-    if (arg_len != 0) {
-      memcpy(start, arg_bytes, arg_len);
-      start += arg_len;
-    }
-
-    
-    uint64_t len = start - temp;
-
-    auto length = reinterpret_cast<uint64_t*>(start - len - sizeof(uint64_t));
-    *length = len;
-    return len + sizeof(uint64_t) + 2 * sizeof(uint64_t);
-  }
-
-
-
-  MethodCall* deserialize(uint8_t* buffer) {
+  MethodCall deserialize(uint8_t* buffer) {
     uint64_t len = *reinterpret_cast<uint64_t*>(buffer);
     // std::cout << "-tot_size: " << len << std::endl;
 
@@ -296,13 +257,12 @@ class ReplicatedObject {
       }
       dependencies_offset += num_process * sizeof(int);
     }
-    MethodCall* output = new MethodCall(id, method_type, arg);
-    output->setDependencies(dependency_vectors);
+    MethodCall output = MethodCall(id, method_type, arg);
+    output.setDependencies(dependency_vectors);
     return output;
   }
 
-
-  MethodCall* deserializeCRDT(uint8_t* buffer) {
+  MethodCall deserialize(char* buffer) {
     uint64_t len = *reinterpret_cast<uint64_t*>(buffer);
     // std::cout << "-tot_size: " << len << std::endl;
 
@@ -318,7 +278,7 @@ class ReplicatedObject {
     // std::cout << "-method: " << method_type << std::endl;
 
     size_t id_offset = 3 * sizeof(uint64_t) + sizeof(int);
-    uint8_t* id_bytes = new uint8_t[id_len];
+    char* id_bytes = new char[id_len];
     memcpy(id_bytes, buffer + id_offset, id_len);
     std::string id(id_bytes, id_bytes + id_len);
 
@@ -328,13 +288,11 @@ class ReplicatedObject {
     std::string arg = "";
     if(arg_len != 0)
     {
-      uint8_t* arg_bytes = new uint8_t[arg_len];
+      char* arg_bytes = new char[arg_len];
       memcpy(arg_bytes, buffer + arg_offset, arg_len);
       arg = std::string(arg_bytes, arg_bytes + arg_len);
       // std::cout << "-arg: " << arg << std::endl;
     }
-    MethodCall* output = new MethodCall(id, method_type, arg);
-    return output;
+    return MethodCall(id, method_type, arg);
   }
-
 };
