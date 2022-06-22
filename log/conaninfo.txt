@@ -1,0 +1,80 @@
+[settings]
+    arch=x86_64
+    build_type=Debug
+    compiler=gcc
+    compiler.cppstd=17
+    compiler.libcxx=libstdc++11
+    compiler.version=7
+    os=Linux
+
+[requires]
+    dory-connection/0.0.1
+    dory-external/0.0.1
+    dory-memory/0.0.1
+    dory-shared/0.0.1
+
+[options]
+    fPIC=True
+    log_level=TRACE
+    lto=True
+    shared=False
+
+[full_settings]
+    arch=x86_64
+    build_type=Debug
+    compiler=gcc
+    compiler.cppstd=17
+    compiler.libcxx=libstdc++11
+    compiler.version=7
+    os=Linux
+
+[full_requires]
+    dory-connection/0.0.1:ef4fb424620497e1e0b7f0186a98dec0be1eeabe
+    dory-ctrl/0.0.1:fb4ac4a542d099bfa0033d44442128dcb9054402
+    dory-external/0.0.1:3b414b6f1701e2c06d0d214fcdf14d6d1e03d36d
+    dory-memory/0.0.1:4949b8a042c8a276fecbdf742b8ffc951aa97499
+    dory-memstore/0.0.1:479b2606695b53c353efe0e9c4c15c21ac6eab11
+    dory-shared/0.0.1:f63326f19ac8d49f2cfd9ad63b7055485f3ba8e0
+    fmt/6.2.1:467844f290ff4af1df60720f1607bc6095cf829c
+    spdlog/1.5.0:e79d06d3eb96a851113589601aefad4c6b2c5f52
+
+[full_options]
+    fPIC=True
+    log_level=TRACE
+    lto=True
+    shared=False
+    dory-connection:fPIC=True
+    dory-connection:log_level=TRACE
+    dory-connection:lto=True
+    dory-connection:shared=False
+    dory-ctrl:fPIC=True
+    dory-ctrl:log_level=TRACE
+    dory-ctrl:lto=True
+    dory-ctrl:shared=False
+    dory-external:shared=False
+    dory-memory:fPIC=True
+    dory-memory:log_level=TRACE
+    dory-memory:lto=True
+    dory-memory:shared=False
+    dory-memstore:fPIC=True
+    dory-memstore:lto=True
+    dory-memstore:shared=False
+    dory-shared:fPIC=True
+    dory-shared:lto=True
+    dory-shared:shared=False
+    fmt:fPIC=True
+    fmt:header_only=False
+    fmt:shared=False
+    fmt:with_fmt_alias=False
+    spdlog:fPIC=True
+    spdlog:header_only=False
+    spdlog:no_exceptions=False
+    spdlog:shared=False
+    spdlog:wchar_filenames=False
+    spdlog:wchar_support=False
+
+[recipe_hash]
+
+
+[env]
+

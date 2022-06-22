@@ -9,10 +9,10 @@
 
 #include "band-nb.hpp"
 
-#include "account.hpp"
-#include "courseware.hpp"
-#include "project.hpp"
-#include "movie.hpp"
+#include "../benchmark/account.hpp"
+#include "../benchmark/courseware.hpp"
+#include "../benchmark/project.hpp"
+#include "../benchmark/movie.hpp"
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -82,68 +82,29 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < object->num_methods; i++)
     response_times[i] = std::unordered_map<std::string, uint64_t>();
 
-
-  std::atomic<bool> own_requests_done = false;
   auto& store = dory::MemoryStore::getInstance();
   NB_Wellcoordination protocol(id, remote_ids, object);
   std::this_thread::sleep_for(std::chrono::seconds(10));
-
+  protocol.rb->hb_active.store(true);
 
   int call_id = 0;
-  std::ifstream leader_requests;
-  std::ifstream follower_requests;
-  std::string l;
-  int new_sent = 0;
-  std::thread leaderChange;
-  if (failed_node == 1) {
-    leader_requests.open((loc + "leader" + ".txt").c_str());
-    leaderChange = std::thread([&] {
-      while (true) {
-        if (own_requests_done.load() &&
-        protocol.tob[0]->amILeader()) {
-          std::cout << "started sending remaining leader messages" << std::endl; 
-          while (getline(leader_requests, l)) {
-            std::string sequence_number =
-            std::to_string(id) + "-" + std::to_string(call_id++);
-            MethodCall call = ReplicatedObject::createCall(sequence_number, l);
-            if (protocol.request(call, false, false).first == ResponseStatus::NoError) new_sent++;
-          }
-          std::cout << "finished sending" << std::endl;
-          break;
-        }
-      }
-      return;
-    });
-  }
-  
-  std::thread followerChange;
-  if (failed_node != 0 && failed_node != 1) {
-    follower_requests.open((loc + "follower" + ".txt").c_str());
-    followerChange = std::thread([&] {
-      while (true) {
-        if (own_requests_done.load()) {
-          std::cout << "started sending remaining follower messages" << std::endl;
-          while (getline(follower_requests, l)) {
-            std::string sequence_number =
-            std::to_string(id) + "-" + std::to_string(call_id++);
-            MethodCall call = ReplicatedObject::createCall(sequence_number, l);
-            if (protocol.request(call, false, false).first == ResponseStatus::NoError) new_sent++;
-          }
-          std::cout << "finished sending" << std::endl;
-          break;
-        }
-      }
-      return;
-    });
-  }
-
   int sent = 0;
   std::string line;
   int expected_calls = 0;
   std::ifstream myfile;
   myfile.open((loc + std::to_string(id) + ".txt").c_str());
 
-  std::cout << "started sending..." << std::endl;
+  std::vector<MethodCall> requests;
+  while (getline(myfile, line)) {
+    if (unlikely(line.at(0) == '#')) {
+      expected_calls = std::stoi(line.substr(1, line.size()));
+      continue;
+    }
+    std::string sequence_number =
+        std::to_string(id) + "-" + std::to_string(call_id++);
+    MethodCall call = ReplicatedObject::createCall(sequence_number, line);
+    requests.push_back(call);
+  }
 
   if(id != 1)
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -153,71 +114,84 @@ int main(int argc, char* argv[]) {
     std::string value;
     while (!store.get(std::to_string(i), value));
   }
+  std::cout << "started sending..." << std::endl;
+
   uint64_t local_start = std::chrono::duration_cast<std::chrono::microseconds>(
                    std::chrono::high_resolution_clock::now().time_since_epoch()).count();
   store.set(std::to_string(id), std::to_string(local_start));
-  
-  // start reading from the request file
-  while (getline(myfile, line)) {
-    if (unlikely(line.at(0) == '#')) {
-      expected_calls = std::stoi(line.substr(1, line.size()));
-      continue;
-    }
-    // failure
-    if (unlikely(id == failed_node && line.at(0) == 'X')) {
-      std::cout << "stoping heartbeat thread and waiting..." << std::endl;
-      protocol.tob[0]->stopHeartbeatThread();
-      std::this_thread::sleep_for(std::chrono::seconds(60));
-      break;
-    }
-    else
-       if (unlikely(line.at(0) == 'X')) continue;
 
-    std::string sequence_number =
-        std::to_string(id) + "-" + std::to_string(call_id++);
-    MethodCall call = ReplicatedObject::createCall(sequence_number, line);
-    // calculating the response time
-    if(!calculate_throughput){
+
+if(calculate_throughput) {
+    // start issuing the requests
+    for(MethodCall call : requests) {
+      std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
+          response = protocol.request(call, false, false);
+      sent++;
+    }
+  }
+  else {
+    // start issuing the requests
+    for(MethodCall call : requests) {
+      // calculating the response time
       auto start = std::chrono::high_resolution_clock::now();
       std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
           response = protocol.request(call, false, false);
-      if (response.first == ResponseStatus::NoError) {
-        sent++;
-        response_times[call.method_type][call.id] =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(response.second -
-                                                                start)
-                .count();
-      }
-    }
-    else{
-      std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
-          response = protocol.request(call, false, false);
-      if (response.first == ResponseStatus::NoError)
-        sent++;
+      sent++;
+      response_times[call.method_type][call.id] =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(response.second -
+                                                                    start)
+            .count();
     }
   }
+
+
+
+  // if(calculate_throughput) {
+  //   // start reading from the request file
+  //   while (getline(myfile, line)) {
+  //   // for(std::string line : requests) {
+  //     if (unlikely(line.at(0) == '#')) {
+  //       expected_calls = std::stoi(line.substr(1, line.size()));
+  //       continue;
+  //     }
+  //     std::string sequence_number =
+  //         std::to_string(id) + "-" + std::to_string(call_id++);
+  //     MethodCall call = ReplicatedObject::createCall(sequence_number, line);
+  //     std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
+  //         response = protocol.request(call, false, false);
+  //     if (response.first == ResponseStatus::NoError)
+  //       sent++;
+  //   }
+  // }
+  // else {
+  //   // start reading from the request file
+  //   while (getline(myfile, line)) {
+  //     if (unlikely(line.at(0) == '#')) {
+  //       expected_calls = std::stoi(line.substr(1, line.size()));
+  //       continue;
+  //     }
+
+  //     std::string sequence_number =
+  //         std::to_string(id) + "-" + std::to_string(call_id++);
+  //     MethodCall call = ReplicatedObject::createCall(sequence_number, line);
+  //     // calculating the response time
+  //     auto start = std::chrono::high_resolution_clock::now();
+  //     std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
+  //         response = protocol.request(call, false, false);
+  //     if (response.first == ResponseStatus::NoError) {
+  //       sent++;
+  //       response_times[call.method_type][call.id] =
+  //           std::chrono::duration_cast<std::chrono::nanoseconds>(response.second -
+  //                                                                 start)
+  //               .count();
+  //     }
+  //   }
+  // }
   uint64_t local_end = std::chrono::duration_cast<std::chrono::microseconds>(
                    std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+  // std::cout << "local_throughput:"
+  //           << static_cast<double>(num_ops)/static_cast<double>(local_end - local_start) << std::endl;
   std::cout << "issued " << sent << " operations" << std::endl;
-
-
-  if(failed_node) {
-    own_requests_done.store(true);
-    // leader failure
-    if(failed_node == 1) {
-      if (protocol.tob[0]->amILeader()) {
-          // wait for the new leader to finish the remaining operations
-          leaderChange.join();
-          std::cout << "new sent: " << new_sent << std::endl;
-      }
-    }
-    // follower failure
-    else {
-      followerChange.join();
-      std::cout << "new sent: " << new_sent << std::endl;
-    }
-
-  }
 
   if(!calculate_throughput){
     double sum = 0;
@@ -260,7 +234,7 @@ int main(int argc, char* argv[]) {
   uint64_t global_end = std::chrono::duration_cast<std::chrono::microseconds>(
                    std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
-  std::cout << "throughput:"
+  std::cout << "throughput: "
             << static_cast<double>(num_ops)/static_cast<double>(global_end - local_start) << std::endl;
 
   std::this_thread::sleep_for(std::chrono::seconds(60));

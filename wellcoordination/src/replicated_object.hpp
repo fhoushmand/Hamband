@@ -13,48 +13,7 @@
 #include <algorithm>
 #include <atomic>
 
-/*
-  Here is the structure of a method call on the memory when we serialize and
-  sent it: (total_length)|uint64_t| + (id_length)|uint64_t| +
-  (call_length)|uint64_t| +
-
-*/
-struct MethodCall {
-  std::string id;
-  int method_type;
-  std::string arg;
-
-  std::vector<uint8_t> payload_buffer;
-  uint8_t* payload;
-  size_t length;
-
-  int** dependency_vectors;
-
-  size_t len;
-
-  MethodCall() {}
-
-
-  MethodCall(std::string id, int method_type, std::string arg) {
-    this->id = id;
-    this->method_type = method_type;
-    this->arg = arg;
-    // payload_buffer.resize(256);
-    // payload = &payload_buffer[0];
-  }
-
-  void setDependencies(int** dependencies) { this->dependency_vectors = dependencies; }
-
-};
-
-
-struct pair_hash {
-    inline std::size_t operator()(const std::pair<std::string,std::string> & v) const {
-        std::hash<std::string> hasher;
-        return hasher(v.first)*31+hasher(v.second);
-    }
-};
-
+#include "synchronizer.hpp"
 
 class ReplicatedObject {
  private:
@@ -71,7 +30,6 @@ class ReplicatedObject {
   std::map<int, int> method_args;
 
   std::atomic<int>** calls_applied;
-  int** calls_applied_crdt;
 
   ReplicatedObject() {}
   ~ReplicatedObject() {}
@@ -89,15 +47,12 @@ class ReplicatedObject {
   ReplicatedObject* finalize(){
     this->num_methods = static_cast<int>(read_methods.size() + update_methods.size());
     calls_applied = new std::atomic<int>*[num_methods];
-    calls_applied_crdt = new int*[num_methods];
     for (int i = 0; i < num_methods; i++){
       calls_applied[i] = new std::atomic<int>[num_process];
-      calls_applied_crdt[i] = new int[num_process];
     }
     for (int x = 0; x < num_methods; x++)
       for (size_t i = 0; i < num_process; i++) {
         calls_applied[x][i] = 0;
-        calls_applied_crdt[x][i] = 0;
       }
     return this;
   }

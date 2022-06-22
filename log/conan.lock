@@ -1,0 +1,120 @@
+{
+ "graph_lock": {
+  "nodes": {
+   "0": {
+    "ref": "dory-log/0.0.1",
+    "options": "fPIC=True\nlog_level=TRACE\nlto=True\nshared=False\ndory-connection:fPIC=True\ndory-connection:log_level=TRACE\ndory-connection:lto=True\ndory-connection:shared=False\ndory-ctrl:fPIC=True\ndory-ctrl:log_level=TRACE\ndory-ctrl:lto=True\ndory-ctrl:shared=False\ndory-external:shared=False\ndory-memory:fPIC=True\ndory-memory:log_level=TRACE\ndory-memory:lto=True\ndory-memory:shared=False\ndory-memstore:fPIC=True\ndory-memstore:lto=True\ndory-memstore:shared=False\ndory-shared:fPIC=True\ndory-shared:lto=True\ndory-shared:shared=False\nfmt:fPIC=True\nfmt:header_only=False\nfmt:shared=False\nfmt:with_fmt_alias=False\nspdlog:fPIC=True\nspdlog:header_only=False\nspdlog:no_exceptions=False\nspdlog:shared=False\nspdlog:wchar_filenames=False\nspdlog:wchar_support=False",
+    "python_requires": [
+     "dory-compiler-options/0.0.1@dory/stable"
+    ],
+    "requires": [
+     "1",
+     "4",
+     "5",
+     "6"
+    ],
+    "path": "conanfile.py",
+    "context": "host"
+   },
+   "1": {
+    "ref": "dory-shared/0.0.1",
+    "options": "fPIC=True\nlto=True\nshared=False\nfmt:fPIC=True\nfmt:header_only=False\nfmt:shared=False\nfmt:with_fmt_alias=False\nspdlog:fPIC=True\nspdlog:header_only=False\nspdlog:no_exceptions=False\nspdlog:shared=False\nspdlog:wchar_filenames=False\nspdlog:wchar_support=False",
+    "package_id": "f63326f19ac8d49f2cfd9ad63b7055485f3ba8e0",
+    "prev": "0",
+    "python_requires": [
+     "dory-compiler-options/0.0.1@dory/stable"
+    ],
+    "requires": [
+     "2"
+    ],
+    "context": "host"
+   },
+   "2": {
+    "ref": "spdlog/1.5.0",
+    "options": "fPIC=True\nheader_only=False\nno_exceptions=False\nshared=False\nwchar_filenames=False\nwchar_support=False\nfmt:fPIC=True\nfmt:header_only=False\nfmt:shared=False\nfmt:with_fmt_alias=False",
+    "package_id": "e79d06d3eb96a851113589601aefad4c6b2c5f52",
+    "prev": "0",
+    "requires": [
+     "3"
+    ],
+    "context": "host"
+   },
+   "3": {
+    "ref": "fmt/6.2.1",
+    "options": "fPIC=True\nheader_only=False\nshared=False\nwith_fmt_alias=False",
+    "package_id": "467844f290ff4af1df60720f1607bc6095cf829c",
+    "prev": "0",
+    "context": "host"
+   },
+   "4": {
+    "ref": "dory-external/0.0.1",
+    "options": "shared=False",
+    "package_id": "3b414b6f1701e2c06d0d214fcdf14d6d1e03d36d",
+    "prev": "0",
+    "python_requires": [
+     "dory-compiler-options/0.0.1@dory/stable"
+    ],
+    "context": "host"
+   },
+   "5": {
+    "ref": "dory-memory/0.0.1",
+    "options": "fPIC=True\nlog_level=TRACE\nlto=True\nshared=False\ndory-shared:fPIC=True\ndory-shared:lto=True\ndory-shared:shared=False\nfmt:fPIC=True\nfmt:header_only=False\nfmt:shared=False\nfmt:with_fmt_alias=False\nspdlog:fPIC=True\nspdlog:header_only=False\nspdlog:no_exceptions=False\nspdlog:shared=False\nspdlog:wchar_filenames=False\nspdlog:wchar_support=False",
+    "package_id": "4949b8a042c8a276fecbdf742b8ffc951aa97499",
+    "prev": "0",
+    "python_requires": [
+     "dory-compiler-options/0.0.1@dory/stable"
+    ],
+    "requires": [
+     "1"
+    ],
+    "context": "host"
+   },
+   "6": {
+    "ref": "dory-connection/0.0.1",
+    "options": "fPIC=True\nlog_level=TRACE\nlto=True\nshared=False\ndory-ctrl:fPIC=True\ndory-ctrl:log_level=TRACE\ndory-ctrl:lto=True\ndory-ctrl:shared=False\ndory-external:shared=False\ndory-memstore:fPIC=True\ndory-memstore:lto=True\ndory-memstore:shared=False\ndory-shared:fPIC=True\ndory-shared:lto=True\ndory-shared:shared=False\nfmt:fPIC=True\nfmt:header_only=False\nfmt:shared=False\nfmt:with_fmt_alias=False\nspdlog:fPIC=True\nspdlog:header_only=False\nspdlog:no_exceptions=False\nspdlog:shared=False\nspdlog:wchar_filenames=False\nspdlog:wchar_support=False",
+    "package_id": "ef4fb424620497e1e0b7f0186a98dec0be1eeabe",
+    "prev": "0",
+    "python_requires": [
+     "dory-compiler-options/0.0.1@dory/stable"
+    ],
+    "requires": [
+     "1",
+     "7",
+     "8"
+    ],
+    "context": "host"
+   },
+   "7": {
+    "ref": "dory-ctrl/0.0.1",
+    "options": "fPIC=True\nlog_level=TRACE\nlto=True\nshared=False\ndory-external:shared=False\ndory-shared:fPIC=True\ndory-shared:lto=True\ndory-shared:shared=False\nfmt:fPIC=True\nfmt:header_only=False\nfmt:shared=False\nfmt:with_fmt_alias=False\nspdlog:fPIC=True\nspdlog:header_only=False\nspdlog:no_exceptions=False\nspdlog:shared=False\nspdlog:wchar_filenames=False\nspdlog:wchar_support=False",
+    "package_id": "fb4ac4a542d099bfa0033d44442128dcb9054402",
+    "prev": "0",
+    "python_requires": [
+     "dory-compiler-options/0.0.1@dory/stable"
+    ],
+    "requires": [
+     "1",
+     "4"
+    ],
+    "context": "host"
+   },
+   "8": {
+    "ref": "dory-memstore/0.0.1",
+    "options": "fPIC=True\nlto=True\nshared=False\ndory-external:shared=False\ndory-shared:fPIC=True\ndory-shared:lto=True\ndory-shared:shared=False\nfmt:fPIC=True\nfmt:header_only=False\nfmt:shared=False\nfmt:with_fmt_alias=False\nspdlog:fPIC=True\nspdlog:header_only=False\nspdlog:no_exceptions=False\nspdlog:shared=False\nspdlog:wchar_filenames=False\nspdlog:wchar_support=False",
+    "package_id": "479b2606695b53c353efe0e9c4c15c21ac6eab11",
+    "prev": "0",
+    "python_requires": [
+     "dory-compiler-options/0.0.1@dory/stable"
+    ],
+    "requires": [
+     "1",
+     "4"
+    ],
+    "context": "host"
+   }
+  },
+  "revisions_enabled": false
+ },
+ "version": "0.4",
+ "profile_host": "[settings]\narch=x86_64\narch_build=x86_64\nbuild_type=Debug\ncompiler=gcc\ncompiler.cppstd=17\ncompiler.libcxx=libstdc++11\ncompiler.version=7\nos=Linux\nos_build=Linux\n[options]\n[build_requires]\n[env]\n"
+}

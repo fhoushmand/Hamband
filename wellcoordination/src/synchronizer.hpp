@@ -12,7 +12,47 @@
 #include <vector>
 #include <set>
 
-#include "replicated_object.hpp"
+/*
+  Here is the structure of a method call on the memory when we serialize and
+  sent it: (total_length)|uint64_t| + (id_length)|uint64_t| +
+  (call_length)|uint64_t| +
+
+*/
+struct MethodCall {
+  std::string id;
+  int method_type;
+  std::string arg;
+
+  std::vector<uint8_t> payload_buffer;
+  uint8_t* payload;
+  size_t length;
+
+  int** dependency_vectors;
+
+  size_t len;
+
+  MethodCall() {}
+
+
+  MethodCall(std::string id, int method_type, std::string arg) {
+    this->id = id;
+    this->method_type = method_type;
+    this->arg = arg;
+    // payload_buffer.resize(256);
+    // payload = &payload_buffer[0];
+  }
+
+  void setDependencies(int** dependencies) { this->dependency_vectors = dependencies; }
+
+};
+
+struct pair_hash {
+    inline std::size_t operator()(const std::pair<std::string,std::string> & v) const {
+        std::hash<std::string> hasher;
+        return hasher(v.first)*31+hasher(v.second);
+    }
+};
+
 
 enum class ResponseStatus {
   NoError = 0,  // Placeholder for the 0 value

@@ -1,0 +1,4 @@
+# ninja log v5
+3	3316	1646788091875132018	CMakeFiles/dorylog.dir/log-iterators.cpp.o	1e2697fe5c9c036d
+3621	3671	1646788092232093847	lib/libdorylog.a	aa547f191060bcea
+0	3621	1646788092179120670	CMakeFiles/dorylog.dir/log.cpp.o	26dd7cf204bbec46

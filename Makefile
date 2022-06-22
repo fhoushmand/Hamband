@@ -70,7 +70,7 @@ make_args: force $(DEPDIR)
 .PHONY: demo crash-consensus neb
 
 # Define the targets you want to compile as conan libraries/conan binaries.
-TARGETS := extern shared memstore crypto ctrl conn demo crash-consensus neb
+TARGETS := extern shared memstore crypto ctrl conn log demo crash-consensus neb
 
 
 # Specify only the local dependencies for the given conan libraries/binaries

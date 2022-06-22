@@ -47,9 +47,9 @@ class NB_Wellcoordination : Synchronizer {
                                         [[maybe_unused]] uint8_t* buf,
                                         [[maybe_unused]] size_t len) {
         // std::cout << "commit" << std::endl;
-        MethodCall* request = repl_object->deserialize(buf);
+        MethodCall request = repl_object->deserialize(buf);
         // check execution and block if dependencies are not satisfied
-        executeOrBlock(*request, leader, static_cast<int>(i));
+        executeOrBlock(request, leader, static_cast<int>(i));
       });
     }
   }
@@ -86,8 +86,7 @@ class NB_Wellcoordination : Synchronizer {
       //reliable broadcast
       rb->broadcast(payload, length, summarize);
 
-      auto res = response(request, ResponseStatus::NoError, debug);
-      return res;
+      return response(request, ResponseStatus::NoError, debug);
     }
     // conflicting call
     else {
@@ -136,7 +135,6 @@ class NB_Wellcoordination : Synchronizer {
 void NB_Wellcoordination::executeOrBlock(MethodCall call, bool leader, int l) {
   while (!leader && !checkCallDependencies(call));
   repl_object->internalExecute(call, 0); 
-  // calls_applied[call.method_type][0]++;
   return;
 }
 
@@ -144,17 +142,11 @@ bool NB_Wellcoordination::checkCallDependencies(MethodCall callWithDeps) {
   if (repl_object->dependency_relation.find(callWithDeps.method_type) == repl_object->dependency_relation.end()) return true;
   for (size_t x = 0; x < repl_object->dependency_relation[callWithDeps.method_type].size(); x++) {
     int dependency_method = repl_object->dependency_relation[callWithDeps.method_type][x];
-    // std::cout << "applied " << dependency_method << " = {";
     for (size_t i = 0; i < num_process; i++){
-      // if(i == num_process - 1)
-      //   std::cout << calls_applied[dependency_method][i];
-      // else
-      //   std::cout << calls_applied[dependency_method][i] << ",";
       if (repl_object->calls_applied[dependency_method][i] <
           callWithDeps.dependency_vectors[x][i])
         return false;
     }
-    // std::cout << "}" << std::endl;
   }
   return true;
 }

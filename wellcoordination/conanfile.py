@@ -49,9 +49,13 @@ class DoryDemoConan(ConanFile):
 
     def build(self):
         generator = self.python_requires["dory-compiler-options"].module.generator()
+        print(self.python_requires["dory-compiler-options"].module)
         cmake = CMake(self, generator = generator)
         self.python_requires["dory-compiler-options"].module.set_options(cmake)
         cmake.definitions["DORY_LTO"] = str(self.options.lto).upper()
+        # cmake.definitions["CONAN_CXX_FLAGS"] = "-Wno-conversion -Wno-error=noexcept -Wno-error=undef -Wno-error=old-style-cast -Wno-error=return-type"
         # cmake.definitions['SPDLOG_ACTIVE_LEVEL'] = "SPDLOG_LEVEL_{}".format(self.options.log_level)
         cmake.configure(source_folder="src")
         cmake.build()
+
+        #../oneTBB/build/linux_intel64_gcc_cc4.9.3_libc2.17_kernel3.10.0_release/ -ltbb -ltbbmalloc -lrt -Iinclude;

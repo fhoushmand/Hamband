@@ -9,12 +9,13 @@
 
 #include "band-crdt.hpp"
 
-// change these to the crdt versions
-#include "counter.hpp"
-#include "gset.hpp"
-#include "orset-crdt.hpp"
-#include "register.hpp"
-#include "shop.hpp"
+#include "../config.h"
+
+#include "../benchmark/counter-crdt.hpp"
+#include "../benchmark/gset-crdt.hpp"
+#include "../benchmark/orset-crdt.hpp"
+#include "../benchmark/register-crdt.hpp"
+#include "../benchmark/shop-crdt.hpp"
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -27,18 +28,17 @@ int main(int argc, char* argv[]) {
   int num_ops = static_cast<int>(std::atoi(argv[3]));
   double write_percentage = static_cast<double>(std::atoi(argv[4]));
   std::string usecase = std::string(argv[5]);
-  bool calculate_throughput = (std::atoi(argv[6]) == 1);
+  // bool calculate_throughput = (std::atoi(argv[6]) == 1);
   double total_writes = num_ops * (write_percentage / 100);
 
   // 0 for no failure
   // 2 for leader failure
-  int failed_node = std::atoi(argv[7]);
+  int failed_node = std::atoi(argv[6]);
 
   std::cout << "number of operations: " << num_ops << std::endl;
   std::cout << "write precentage: "
             << static_cast<double>(write_percentage / 100) << std::endl;
-  std::string loc =
-      "/rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/";
+  std::string loc = WORKLOAD_LOCATION;
   loc += std::to_string(nr_procs) + "-" + std::to_string(num_ops) + "-" +
          std::to_string(static_cast<int>(write_percentage));
   loc += "/" + usecase + "/";
@@ -78,21 +78,52 @@ int main(int argc, char* argv[]) {
     response_times[i] = std::unordered_map<std::string, uint64_t>();
 
   auto& store = dory::MemoryStore::getInstance();
-  NB_Wellcoordination protocol(id, remote_ids, object);
+  BandCRDT protocol(id, remote_ids, object);
   std::this_thread::sleep_for(std::chrono::seconds(10));
-  protocol.rb->hb_active.store(true);
 
-
-
+  
   int call_id = 0;
+
+  std::string l;
+  std::vector<MethodCall> redirect_requests;
+  std::ifstream failed_node_requests;
+  failed_node_requests.open((loc + "redirect" + ".txt").c_str());
+  while (getline(failed_node_requests, l)) 
+  {
+    std::string sequence_number = std::to_string(id) + "-" + std::to_string(call_id++);
+    MethodCall call = ReplicatedObject::createCall(sequence_number, l);
+    redirect_requests.push_back(call);
+  }
+
+  int new_sent = 0;
+  std::thread requestRedirector;
+  std::atomic<bool> own_requests_done = false;
+  if(failed_node == 1 && id == failed_node + 1){
+    requestRedirector = std::thread([&] {
+      while (true) {
+        if (own_requests_done.load()) {
+          for (MethodCall req : redirect_requests) {
+            protocol.request(req, false, false);
+            new_sent++;
+          }
+          break;
+        }
+      }
+      return;
+    });
+  }
+
+  
   int sent = 0;
   std::string line;
   int expected_calls = 0;
   std::ifstream myfile;
   myfile.open((loc + std::to_string(id) + ".txt").c_str());
-
+  std::cout << "fetching the requests" << std::endl;
   std::vector<MethodCall> requests;
   while (getline(myfile, line)) {
+    if (unlikely(line.at(0) == 'X')) 
+      break;
     if (unlikely(line.at(0) == '#')) {
       expected_calls = std::stoi(line.substr(1, line.size()));
       continue;
@@ -103,8 +134,6 @@ int main(int argc, char* argv[]) {
     requests.push_back(call);
   }
 
-  std::cout << "started sending..." << std::endl;
-
   if(id != 1)
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   store.set(std::to_string(id), "ready");
@@ -113,30 +142,33 @@ int main(int argc, char* argv[]) {
     std::string value;
     while (!store.get(std::to_string(i), value));
   }
+
+  std::cout << "started sending..." << std::endl;
+
   uint64_t local_start = std::chrono::duration_cast<std::chrono::microseconds>(
                    std::chrono::high_resolution_clock::now().time_since_epoch()).count();
   store.set(std::to_string(id), std::to_string(local_start));
 
-  if(calculate_throughput) {
+  auto start = std::chrono::high_resolution_clock::now();
+  if(id == failed_node)
+  {
     // start issuing the requests
     for(MethodCall call : requests) {
-      std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
-          response = protocol.request(call, false, false);
+      if (unlikely(sent == static_cast<int>(requests.size()/2))) {
+        std::cout << "stoping heartbeat thread and waiting..." << std::endl;
+        protocol.rb->hb_active.store(false);
+        std::this_thread::sleep_for(std::chrono::seconds(60));
+        break;
+      }
+      protocol.request(call, false, false);
       sent++;
     }
   }
-  else {
+  else{
     // start issuing the requests
     for(MethodCall call : requests) {
-      // calculating the response time
-      auto start = std::chrono::high_resolution_clock::now();
-      std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
-          response = protocol.request(call, false, false);
+      protocol.request(call, false, false);
       sent++;
-      response_times[call.method_type][call.id] =
-          std::chrono::duration_cast<std::chrono::nanoseconds>(response.second -
-                                                                    start)
-            .count();
     }
   }
   uint64_t local_end = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -144,51 +176,37 @@ int main(int argc, char* argv[]) {
 
   std::cout << "issued " << sent << " operations" << std::endl;
 
+  std::cout << "total average response time for " << sent
+              << " calls: " << static_cast<double>(local_end - local_start)  / static_cast<int>(sent) << std::endl;
 
-  if(!calculate_throughput){
-    double sum = 0;
-    double total_sum = 0;
-    size_t num = 0;
-    for (int i = 0; i < object->num_methods; i++) {
-      total_sum += sum;
-      sum = 0;
-      for (auto& pair : response_times[i]){
-        sum += static_cast<double>(pair.second);
-        num++;
-      }
-      std::cout << "average response time for " << response_times[i].size()
-                << " calls to " << i << ": "
-                << (sum/1000) / static_cast<int>(response_times[i].size()) << std::endl;
-    }
-    std::cout << "total average response time for " << num
-              << " calls: " << (total_sum/1000) / static_cast<int>(num) << std::endl;
+
+  if(failed_node == 1 && id == failed_node + 1){
+    own_requests_done.store(true);
+    requestRedirector.join();
+    std::cout << "new sent: " << new_sent << std::endl;
   }
 
   // wait for all the ops to arrive and then calculate throughput
   int cs = 0;
-  int sz = static_cast<int>(object->synch_groups.size());
   while (true) {
     cs = 0;
-    for (int i = 0; i < object->num_methods; i++)
-      for (int x = 0; x < nr_procs; x++) cs += protocol.repl_object->calls_applied_crdt[i][x];
-    if(sz == 1){
-      if (cs == ((id != 1) ? (expected_calls - 1) : expected_calls))
-        break;
+    for (int i = 0; i < object->num_methods; i++){
+      for (int x = 0; x < nr_procs; x++) {
+        cs += protocol.repl_object->calls_applied[i][x];
+      }
     }
-    else{
-      if (cs == ((id > sz) ? (expected_calls - sz) : expected_calls - 1))
-        break;
-    }
+    // std::cout << "received: " << cs << std::endl;
+    if (cs == expected_calls)
+      break;
     std::this_thread::sleep_for(std::chrono::microseconds(10));
   }
 
   uint64_t global_end = std::chrono::duration_cast<std::chrono::microseconds>(
                    std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
-  std::cout << "throughput:"
+  std::cout << "throughput: "
             << static_cast<double>(num_ops)/static_cast<double>(global_end - local_start) << std::endl;
   object->toString();
-
   std::this_thread::sleep_for(std::chrono::seconds(60));
   return 0;
 }

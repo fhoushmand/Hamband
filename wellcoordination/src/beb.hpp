@@ -37,6 +37,7 @@ class ReliableBroadcast {
   std::unique_ptr<ControlBlock> cb;
   std::vector<struct ibv_wc> entries;
   static constexpr int history_length = 50;
+  uint8_t* zero = new uint8_t(0);
   Devices d;
   OpenDevice od;
 
@@ -245,9 +246,8 @@ void ReliableBroadcast::deliverAndExecute() {
       ParsedCall pslot = ParsedCall(partIter.location(i - 1));
       auto [buf, len] = pslot.payload();
       if (!pslot.isPopulated()) break;
-      MethodCall* call = replicated_object->deserialize(buf);
-      // replicated_object->printCall(*call);
-      replicated_object->internalExecute(*call, i - 1);
+      MethodCall call = replicated_object->deserialize(buf);
+      replicated_object->internalExecute(call, i - 1);
       partIter.next(i - 1);
     }
   }
@@ -331,21 +331,18 @@ bool ReliableBroadcast::broadcast(uint8_t *payload, size_t length,
   // writing the call to the temporary location so others can read in case of
   // failure (backup)
   // std::cout << "writing locally for backup" << std::endl;
-  memcpy(log.get()->bufPtr() + (8 * 64), address,
-             static_cast<uint32_t>(size));
+
+  uint8_t* backup = log.get()->bufPtr() + (8 * 64);
+
+  backup = address;
+  // memcpy(log.get()->bufPtr() + (8 * 64), address,
+            //  static_cast<uint32_t>(size));
+
   // std::cout << "start broadcast4" << std::endl;
   
 
   int i = 1;
   for (auto &[pid, rc] : ce->connections()) {
-    // if(replicated_object->self == 2)
-      // std::cout << "writing " << payload << " to: " << pid << std::endl;
-    // failure
-    //   if(replicated_object->self == 1 && req_id == 1){
-    //     hb_active.store(false);
-    //     std::this_thread::sleep_for(std::chrono::seconds(60));
-    // }
-
     auto ok = rc.postSendSingle(
         ReliableConnection::RdmaWrite,
         quorum::pack(quorum::EntryWr, i, req_id), address,
@@ -356,7 +353,12 @@ bool ReliableBroadcast::broadcast(uint8_t *payload, size_t length,
   pollCQ(static_cast<int>(remote_ids.size()));
   // clearing the backup
   // std::cout << "clearing backup location" << std::endl;
-  memset(log.get()->bufPtr() + 8 * 64, 0x0, 512);
+
+
+  // memset(log.get()->bufPtr() + 8 * 64, 0x0, 512);
+
+  backup = zero;
+
   // std::this_thread::sleep_for(std::chrono::seconds(4));
   return true;
 }

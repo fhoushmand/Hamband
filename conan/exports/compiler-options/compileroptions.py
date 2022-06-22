@@ -8,12 +8,14 @@ if sys.version_info[0] < 3:
 options = {
     "BUILD_TYPE": {
         "DEBUG": [
+            "-O0",
             # "-O3" agressively inlines functions causing -Winline to trigger
             # warnings, so we only use it in debug mode
             # Warn if a function that is declared as inline cannot be inlined
             "-Winline",
             # Generate source-level debug information
-            "-g",
+            "-ggdb3",
+            "-fsanitize=address",
         ],
         "RELEASE": [
             # Optimizations as most as possible
@@ -93,15 +95,15 @@ options = {
             # a C++ program. The new-style casts (dynamic_cast, static_cast,
             # reinterpret_cast, and const_cast) are less vulnerable to unintended
             # effects and much easier to search for.
-            "-Wold-style-cast",
+            #"-Wold-style-cast",
         ],
         "C": [],
     },
     "GENERAL": [
         # Make all warnings into errors
-        "-Werror",
+        #"-Werror",
         # Turns on the above mentioned flags
-        "-Wall",
+        #"-Wall",
         # Warn about implicit conversions
         "-Wconversion",
         # Warn if floating-point values are used in equality comparisons
@@ -171,7 +173,7 @@ options = {
         # compiler reduces the magnitude of a constant involved in a comparison)
         "-Wstrict-overflow=5",
         # Warn if an undefined identifier is evaluated in an #if directive
-        "-Wundef",
+        #"-Wundef",
         # Enables unused warnings as:
         #   -Wunused-function,
         #   -Wunused-label,
@@ -179,6 +181,7 @@ options = {
         #   -Wunused-variable,
         #   -Wsign-conversion
         "-Wno-unused",
+        "-Wno-conversion",
     ],
 }
 

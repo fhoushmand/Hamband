@@ -22,7 +22,7 @@
 #include <unordered_set>
 #include <atomic>
 #include "logger.hpp"
-#include "replicated_object.hpp"
+#include "replicated_object_crdt.hpp"
 
 using namespace dory;
 
@@ -73,6 +73,7 @@ class ReliableBroadcast {
   int read_seq = 0;
   std::unordered_set<int> failed_nodes;
   std::atomic<bool> hb_active;
+  std::atomic<bool> fd_active;
   uint64_t *counter_from;
   int max_id;
 
@@ -94,6 +95,9 @@ ReliableBroadcast::ReliableBroadcast(int id, std::vector<int> r_ids, ReplicatedO
   ids.push_back(replicated_object->self);
   std::sort(ids.begin(), ids.end());
   max_id = *(std::minmax_element(ids.begin(), ids.end()).second);
+  hb_active.store(false);
+  fd_active.store(false);
+
 
   // Exchange info using memcached
   auto &store = MemoryStore::getInstance();
@@ -163,8 +167,8 @@ ReliableBroadcast::ReliableBroadcast(int id, std::vector<int> r_ids, ReplicatedO
       scanHeartbeats();
   });
   std::thread fd_thd = std::thread([&]() {
-    // std::this_thread::sleep_for(std::chrono::seconds(5));
-    while (hb_active.load()) {
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    while (fd_active.load()) {
       for (int i = 1; i <= static_cast<int>(ids.size()); i++) {
         if (i == replicated_object->self || failed_nodes.find(i) != failed_nodes.end()) continue;
         if (status[i].consecutive_updates <= 20){ 
@@ -174,17 +178,17 @@ ReliableBroadcast::ReliableBroadcast(int id, std::vector<int> r_ids, ReplicatedO
           // check if there exists any unreceived writes
           // std::cout << "reading from " << i << " at: " << std::hex << ce->connections().at(i).remoteBuf() << ":" << std::dec << (8 * 64) << std::endl;
 
-          std::vector<uint8_t> payload_buffer(256);
+          std::vector<uint8_t> payload_buffer(512);
           uint8_t* payload = &payload_buffer[0];
           Call call(*log.get(), partIter.offset(replicated_object->self - 1),
-                      payload, 256, false);
+                      payload, 512, false);
           auto [address, offset, size] = call.location();
 
           auto out = ce->connections().at(i).postSendSingle(
                   ReliableConnection::RdmaRead,
                   quorum::pack(quorum::EntryRd, i, 10),
                   address,
-                  256, 
+                  512, 
                   ce->connections().at(i).remoteBuf() + (8 * 64));
           std::this_thread::sleep_for(std::chrono::milliseconds(50));
           pollCQ(1);
@@ -192,31 +196,31 @@ ReliableBroadcast::ReliableBroadcast(int id, std::vector<int> r_ids, ReplicatedO
           auto [buf, len] = pslot.payload();
           // check if already applied it or not
           if (pslot.isPopulated()){
-            MethodCall* c = replicated_object->deserialize(buf);
+            MethodCall c = replicated_object->deserializeCRDT(buf);
             // std::cout << "saved call of the crashed node: " << std::endl;
             // replicated_object.toString(*c);
 
-            MethodCall* tailCall = NULL;
+            MethodCall tailCall;
             while (partIter.hasNext(i - 1)) {
               ParsedCall pslot = ParsedCall(partIter.location(i - 1));
               auto [buf, len] = pslot.payload();
               if (!pslot.isPopulated()) break;
-              tailCall = replicated_object->deserialize(buf);
+              tailCall = replicated_object->deserializeCRDT(buf);
               partIter.next(i - 1);
             }
-            if(tailCall != NULL){
+            if(tailCall.len != 0){
               // std::cout << "last call received from the crashed node: " << std::endl;  
               // replicated_object.toString(*tailCall);
-              if(tailCall->id != c->id){
+              if(tailCall.id != c.id){
                 std::cout << "fetching unreceived call from the crashed node (not-null)" << std::endl;
-                replicated_object->internalExecute(*c, i - 1);
-                replicated_object->printCall(*c);
+                replicated_object->internalDownstreamExecuteCRDT(c, i - 1, false);
+                replicated_object->printCall(c);
               }
             }
             else{
               std::cout << "fetching unreceived call from the crashed node (null)" << std::endl;
-              replicated_object->internalExecute(*c, i - 1);
-              replicated_object->printCall(*c);
+              replicated_object->internalDownstreamExecuteCRDT(c, i - 1, false);
+              replicated_object->printCall(c);
             }
           }
         }
@@ -245,8 +249,8 @@ void ReliableBroadcast::deliverAndExecute() {
       ParsedCall pslot = ParsedCall(partIter.location(i - 1));
       auto [buf, len] = pslot.payload();
       if (!pslot.isPopulated()) break;
-      MethodCall* call = replicated_object->deserializeCRDT(buf);
-      replicated_object->internalExecuteCRDT(*call, i - 1);
+      MethodCall call = replicated_object->deserializeCRDT(buf);
+      replicated_object->internalDownstreamExecuteCRDT(call, i - 1, true);
       partIter.next(i - 1);
     }
   }

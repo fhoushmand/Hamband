@@ -45,3 +45,6 @@ build/
 .deps/
 
 wellcoordination/workload/**
+
+.ssh/*
+*~

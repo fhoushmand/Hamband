@@ -4,6 +4,7 @@
 #include <dory/shared/branching.hpp>
 
 #include "synchronizer.hpp"
+#include "replicated_object.hpp"
 
 class Mu : Synchronizer {
   //  private:
@@ -15,6 +16,8 @@ class Mu : Synchronizer {
   std::unique_ptr<dory::Consensus> tob;
   uint64_t throughput_end;
   ReplicatedObject* repl_object;
+  std::vector<uint8_t> payload_buffer;
+  uint8_t* payload;
 
   ~Mu() {}
 
@@ -22,6 +25,8 @@ class Mu : Synchronizer {
     remote_ids = r_ids;
     num_process = remote_ids.size() + 1;
     repl_object = obj;
+    payload_buffer.resize(256);
+    payload = &payload_buffer[0];
     
     tob = std::make_unique<dory::Consensus>(id, remote_ids, 8,
                                                      dory::ThreadBank::A);
@@ -33,10 +38,8 @@ class Mu : Synchronizer {
     tob->commitHandler([&]([[maybe_unused]] bool leader,
                                     [[maybe_unused]] uint8_t* buf,
                                     [[maybe_unused]] size_t len) {
-      MethodCall* response = repl_object->deserialize(buf);
-      // std::cout << "received call" << std::endl;
-      repl_object->internalExecute(*response, 0);
-      // calls_applied[response->method_type][0]++;
+      MethodCall response = repl_object->deserialize(buf);
+      repl_object->internalExecute(response, 0);
     });
   }
 
@@ -46,14 +49,12 @@ class Mu : Synchronizer {
     if (std::find(repl_object->read_methods.begin(), repl_object->read_methods.end(), request.method_type) != repl_object->read_methods.end()) 
       return response(request, ResponseStatus::NoError, false);
 
-    
-    std::vector<uint8_t> payload_buffer(256);
-    uint8_t* payload = &payload_buffer[0];
+    // no need to check (all calls are made to be permissible)
+    // if (!repl_object->isPermissible(request)) {
+    //   std::cout << "not permissible, dropping request" << std::endl;
+    //   return response(request, ResponseStatus::NotPermissible, debug);
+    // }
 
-    if (!repl_object->isPermissible(request)) {
-      std::cout << "not permissible, dropping request" << std::endl;
-      return response(request, ResponseStatus::NotPermissible, debug);
-    }
     // serialize the call
     auto length = repl_object->serialize(request, payload);
     payload_buffer.resize(length);
@@ -84,8 +85,6 @@ class Mu : Synchronizer {
 
         case dory::ProposeError::MutexUnavailable:
         case dory::ProposeError::FollowerMode:
-          // std::cout << "Error: in follower mode. Potential leader: "
-          //           << tob->potentialLeader() << std::endl;
           break;
 
         default:
