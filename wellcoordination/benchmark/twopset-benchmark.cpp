@@ -32,7 +32,8 @@ int main(int argc, char* argv[]) {
   double total_writes = num_ops * write_percentage;
   int queries = num_ops - total_writes;
 
-  int num_nonconflicting_write_methods = 2;
+  int num_conflicting_write_methods = 0;
+  int num_nonconflicting_write_methods = 1;
   int num_read_methods = 1;
 
   std::cout << "ops: " << num_ops << std::endl;
@@ -40,79 +41,87 @@ int main(int argc, char* argv[]) {
   std::cout << "writes: " << total_writes << std::endl;
   std::cout << "reads: " << queries << std::endl;
 
-  int expected_calls_per_update_method = total_writes /num_nonconflicting_write_methods;
+  int expected_calls_per_update_method =
+      total_writes /
+      (num_conflicting_write_methods + num_nonconflicting_write_methods);
   std::cout << "expected #calls per update method "
             << expected_calls_per_update_method << std::endl;
 
-  int expected_calls_per_update_method_per_node = expected_calls_per_update_method / nr_procs;
+  std::cout << "expected #calls per conflicting writes in leader "
+            << expected_calls_per_update_method << std::endl;
+  std::cout << "total conflicting #calls in leader "
+            << expected_calls_per_update_method * num_conflicting_write_methods
+            << std::endl;
+
+  int expected_nonconflicting_write_calls_per_node =
+      (total_writes -
+       expected_calls_per_update_method * num_conflicting_write_methods) /
+      (nr_procs);
 
   std::cout << "expected #calls per nonconflicting writes in nodes "
-            << expected_calls_per_update_method_per_node << std::endl;
+            << expected_nonconflicting_write_calls_per_node << std::endl;
+  std::cout << "total nonconflicting #calls in nodes "
+            << expected_nonconflicting_write_calls_per_node *
+                   num_nonconflicting_write_methods * (nr_procs)
+            << std::endl;
 
   int write_calls =
-      expected_calls_per_update_method * num_nonconflicting_write_methods;
+      expected_calls_per_update_method * num_conflicting_write_methods +
+      expected_nonconflicting_write_calls_per_node *
+          num_nonconflicting_write_methods * (nr_procs);
 
-  int write_calls_issued = 0;
-  int reads_issues = 0;
-      
   // first allocating writes operations to the nodes
   for (int i = 1; i <= num_replicas; i++) {
     // non-conflicting write method
-      for (int count = 0;
-          count < expected_calls_per_update_method_per_node; count++) {
-          std::string element = std::to_string(std::rand() % 1000000);
-          std::string callStr;
-          callStr = "0 " + element;
-          calls[i - 1].push_back(callStr);
-          for(int x = 0; x < static_cast<int>(1/write_percentage)+15; x++)
-          {
-            if(calls[i - 1].size() == num_ops/nr_procs) 
-              break;
-            calls[i - 1].push_back(std::string("2"));
-            reads_issues++;
-          }
-          callStr = "1 " + element;
-          calls[i - 1].push_back(callStr);
-          write_calls_issued += 2;
-      }
-      
-  }
-  
+    for (int count = 0;
+        count < expected_nonconflicting_write_calls_per_node; count++) {
+      std::string callStr;
+      // registerStudent
+      std::string s_id = std::to_string(std::rand() % 1000000);
+      if(std::rand() %2==0)
+        callStr = "0 " + s_id;
+      else 
+        callStr = "1 " + s_id;
 
-  std::cout << "write calls issued: " << write_calls_issued << std::endl;
-  std::cout << "read calls issued: " << reads_issues << std::endl;
-
-  // allocate reads to the nodes
-  int q = num_ops - write_calls_issued;  
-  int read_calls = q - reads_issues;
-  std::cout << "extra read calls needed: " << read_calls << std::endl;
-  
-  int index = 0;
-
-  std::cout << "after adding writes to nodes" << std::endl;
-  for (int i = 0; i < nr_procs; i++)
-    std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
-
-
-  if (read_calls != 0) {
-    for (int i = 0; i < nr_procs; i++){
-      for (int j = 0; j < read_calls / nr_procs; j++)
-      {
-        calls[i].push_back(std::string("2"));
-      }
+      MethodCall call = ReplicatedObject::createCall("id", callStr);
+      test->execute(call);
+      calls[i - 1].push_back(callStr);
     }
   }
 
+  // allocate reads to the nodes
+  int q = num_ops - write_calls;
+  std::cout << "q: " << q << std::endl;
 
+  int read_calls = q;
+  int index = 0;
+
+  std::cout << "after adding writes nodes" << std::endl;
+  for (int i = 0; i < nr_procs; i++)
+    std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
+
+  while (calls[0].size() > calls[1].size() && read_calls != 0) {
+    calls[(index % (nr_procs - 1)) + 1].push_back(std::string("2"));
+    read_calls--;
+    index++;
+  }
+  std::cout << "after adding reads to followers" << std::endl;
+  for (int i = 0; i < nr_procs; i++)
+    std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
+
+  if (read_calls != 0) {
+    for (int i = 0; i < nr_procs; i++)
+      for (int j = 0; j < read_calls / nr_procs; j++)
+        calls[i].push_back(std::string("2"));
     std::cout << "after adding reads to all" << std::endl;
     for (int i = 0; i < nr_procs; i++)
       std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
-
+  }
 
   for (int i = 0; i < nr_procs; i++) {
     calls[i].insert(calls[i].begin(),
-                    std::string("#" + std::to_string(write_calls_issued)));
-    // std::random_shuffle(calls[i].begin() + 1, calls[i].end());
+                    std::string("#" + std::to_string(write_calls)));
+    std::random_shuffle(calls[i].begin() + 1, calls[i].end());
   }
 
   for (int i = 0; i < nr_procs; i++) {
@@ -121,6 +130,6 @@ int main(int argc, char* argv[]) {
     outfile[i].close();
   }
 
-  std::cout << "expected calls to receive: " << write_calls_issued << std::endl;
+  std::cout << "expected calls to receive: " << write_calls << std::endl;
   return 0;
 }
