@@ -16,6 +16,7 @@
 #include "../benchmark/orset-crdt.hpp"
 #include "../benchmark/register-crdt.hpp"
 #include "../benchmark/shop-crdt.hpp"
+#include "../benchmark/pnset-crdt.hpp"
 #include "../benchmark/twopset-crdt.hpp"
 
 int main(int argc, char* argv[]) {
@@ -70,6 +71,9 @@ int main(int argc, char* argv[]) {
   }
   else if(usecase == "shop") {
     object = new Shop();
+  }
+  else if(usecase == "pnset") {
+    object = new PNSet();
   }
   else if(usecase == "twopset") {
     object = new TWOPSet();
