@@ -25,8 +25,8 @@ public:
       QUERY = 2
     };
     std::atomic<bool> lock;
-    int pnset[200001][2]={{0}};
-    int arraysize=0;
+    int pnset[200001]={0};
+    //int arraysize=0;
     //int arraysize=0;
     //int setsizesource=0;
     int setsize=0;
@@ -50,7 +50,7 @@ public:
     {
       //state
       std::memcpy(pnset, obj.pnset, sizeof(pnset));
-      arraysize = obj.arraysize;
+      //arraysize = obj.arraysize;
       setsize= obj.setsize;
       //removeset = obj.removeset;
     }
@@ -64,47 +64,23 @@ public:
     // 0
     void add(std::string a)
     {
-      bool find=false;
+
+      //bool find=false;
       while(lock.load());
       lock.store(true);
-      find=false;
-      for(int i=0; i<arraysize; i++){
-        if(pnset[i][0]==std::stoi(a)){
-          pnset[i][1]++;
-          setsize++;
-          find=true;
-          break;
-          }
-        }
-      if(!find){
-        pnset[arraysize][0]= std::stoi(a);
-        pnset[arraysize][1]++;
-        arraysize++;
-        setsize++;
-        }
+      pnset[std::stoi(a)]++;
+      setsize++;
       lock.store(false);
     }
     void remove(std::string a)
     {
-      bool find=false;
+      //bool find=false;
       while(lock.load());
       lock.store(true);
-      find=false;
-      for(int i=0; i<arraysize; i++){
-        if(pnset[i][0]==std::stoi(a)){
-          pnset[i][1]--;
-          setsize--;
-          find=true;
-          break;
-        }
-      }
-      if(!find){
-        pnset[arraysize][0]= std::stoi(a);
-        pnset[arraysize][1]--;
-        arraysize++;
-        setsize--;
-      }
-    lock.store(false);
+      //find=false;
+      pnset[std::stoi(a)]--;
+      setsize--;
+      lock.store(false);
     }
     // 1
     PNSet query() { return *this; }

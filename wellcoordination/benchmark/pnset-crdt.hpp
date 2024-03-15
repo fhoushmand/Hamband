@@ -25,10 +25,10 @@ public:
       QUERY = 2
     };
     std::recursive_mutex m;
-    int pnsetsource[200001][2]={{0}};
-    int pnsetremote[200001][2]={{0}};
-    int arraysizesource=0;
-    int arraysizeremote=0;
+    int pnsetsource[200001]={0};
+    int pnsetremote[200001]={0};
+    //int arraysizesource=0;
+    //int arraysizeremote=0;
     int setsizesource=0;
     int setsizeremote=0;
     /// -------------------------------------------------------------
@@ -51,8 +51,8 @@ public:
       //state
       std::memcpy(pnsetsource, obj.pnsetsource, sizeof(pnsetsource));
       std::memcpy(pnsetremote, obj.pnsetremote, sizeof(pnsetremote));
-      arraysizesource= obj.arraysizesource;
-      arraysizeremote= obj.arraysizeremote;
+      //arraysizesource= obj.arraysizesource;
+      //arraysizeremote= obj.arraysizeremote;
       setsizesource=obj.setsizesource;
       setsizeremote=obj.setsizeremote;
       ///------------------------------------------------------------------------
@@ -78,42 +78,17 @@ public:
     }
     std::string addDownstream(std::string a, bool b)
     {
-      bool find= false;
+      //bool find= false;
       //std::scoped_lock lock(m);
       if (b==false){
-        find=false;
-        for(int i=0; i<arraysizesource; i++){
-          if(pnsetsource[i][0]==std::stoi(a)){
-            pnsetsource[i][1]++;
-            setsizesource++;
-            find=true;
-            break;
-          }
-        }
-        if(!find){
-          pnsetsource[arraysizesource][0]= std::stoi(a);
-          pnsetsource[arraysizesource][1]++;
-          arraysizesource++;
-          setsizesource++;
-        }
+        pnsetsource[std::stoi(a)]++;
+        setsizesource++;
+        //find=false;
       //---------------------------------------------------
       }
       else{
-        find=false;
-        for(int i=0; i<arraysizeremote; i++){
-          if(pnsetremote[i][0]==std::stoi(a)){
-            pnsetremote[i][1]++;
-            setsizeremote++;
-            find=true;
-            break;
-          }
-        }
-        if(!find){
-          pnsetremote[arraysizeremote][0]= std::stoi(a);
-          pnsetremote[arraysizeremote][1]++;
-          arraysizeremote++;
-          setsizeremote++;
-        }
+        pnsetremote[std::stoi(a)]++;
+        setsizeremote++;
 
       //---------------------------------------------------
       }
@@ -122,42 +97,16 @@ public:
     std::string removeDownstream(std::string a, bool b)
     {
       //std::scoped_lock lock(m);
-      bool find= false;
+      //bool find= false;
       //std::scoped_lock lock(m);
       if (b==false){
-        find=false;
-        for(int i=0; i<arraysizesource; i++){
-          if(pnsetsource[i][0]==std::stoi(a)){
-            pnsetsource[i][1]--;
-            setsizesource--;
-            find=true;
-            break;
-          }
-        }
-        if(!find){
-          pnsetsource[arraysizesource][0]= std::stoi(a);
-          pnsetsource[arraysizesource][1]--;
-          arraysizesource++;
-          setsizesource--;
-        }
+        pnsetsource[std::stoi(a)]--;
+        setsizesource--;
       //---------------------------------------------------
       }
       else{
-        find=false;
-        for(int i=0; i<arraysizeremote; i++){
-          if(pnsetremote[i][0]==std::stoi(a)){
-            pnsetremote[i][1]--;
-            setsizeremote--;
-            find=true;
-            break;
-          }
-        }
-        if(!find){
-          pnsetremote[arraysizeremote][0]= std::stoi(a);
-          pnsetremote[arraysizeremote][1]--;
-          arraysizeremote++;
-          setsizeremote--;
-        }
+        pnsetremote[std::stoi(a)]--;
+        setsizeremote--;
 
       //---------------------------------------------------
       }
