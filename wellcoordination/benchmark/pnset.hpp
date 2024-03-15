@@ -64,7 +64,7 @@ public:
     // 0
     void add(std::string a)
     {
-      bool find false;
+      bool find=false;
       while(lock.load());
       lock.store(true);
       find=false;
