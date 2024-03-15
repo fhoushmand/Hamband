@@ -86,6 +86,7 @@ public:
     }
     void remove(std::string a)
     {
+      bool find=false;
       while(lock.load());
       lock.store(true);
       find=false;
