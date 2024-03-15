@@ -69,7 +69,7 @@ public:
       lock.store(true);
       find=false;
       for(int i=0; i<arraysize; i++){
-        if(pnset[i][0]==std::atoi(a)){
+        if(pnset[i][0]==std::stoi(a)){
           pnset[i][1]++;
           setsize++;
           find=true;
@@ -77,7 +77,7 @@ public:
           }
         }
       if(!find){
-        pnset[arraysize][0]= std::atoi(a);
+        pnset[arraysize][0]= std::stoi(a);
         pnset[arraysize][1]++;
         arraysize++;
         setsize++;
@@ -90,7 +90,7 @@ public:
       lock.store(true);
       find=false;
       for(int i=0; i<arraysize; i++){
-        if(pnset[i][0]==std::atoi(a)){
+        if(pnset[i][0]==std::stoi(a)){
           pnset[i][1]--;
           setsize--;
           find=true;
@@ -98,7 +98,7 @@ public:
         }
       }
       if(!find){
-        pnset[arraysize][0]= std::atoi(a);
+        pnset[arraysize][0]= std::stoi(a);
         pnset[arraysize][1]--;
         arraysize++;
         setsize--;

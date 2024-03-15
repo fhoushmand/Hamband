@@ -83,7 +83,7 @@ public:
       if (b==false){
         find=false;
         for(int i=0; i<arraysizesource; i++){
-          if(pnsetsource[i][0]==std::atoi(a)){
+          if(pnsetsource[i][0]==std::stoi(a)){
             pnsetsource[i][1]++;
             setsizesource++;
             find=true;
@@ -91,7 +91,7 @@ public:
           }
         }
         if(!find){
-          pnsetsource[arraysizesource][0]= std::atoi(a);
+          pnsetsource[arraysizesource][0]= std::stoi(a);
           pnsetsource[arraysizesource][1]++;
           arraysizesource++;
           setsizesource++;
@@ -101,7 +101,7 @@ public:
       else{
         find=false;
         for(int i=0; i<arraysizeremote; i++){
-          if(pnsetremote[i][0]==std::atoi(a)){
+          if(pnsetremote[i][0]==std::stoi(a)){
             pnsetremote[i][1]++;
             setsizeremote++;
             find=true;
@@ -109,7 +109,7 @@ public:
           }
         }
         if(!find){
-          pnsetremote[arraysizeremote][0]= std::atoi(a);
+          pnsetremote[arraysizeremote][0]= std::stoi(a);
           pnsetremote[arraysizeremote][1]++;
           arraysizeremote++;
           setsizeremote++;
@@ -127,7 +127,7 @@ public:
       if (b==false){
         find=false;
         for(int i=0; i<arraysizesource; i++){
-          if(pnsetsource[i][0]==std::atoi(a)){
+          if(pnsetsource[i][0]==std::stoi(a)){
             pnsetsource[i][1]--;
             setsizesource--;
             find=true;
@@ -135,7 +135,7 @@ public:
           }
         }
         if(!find){
-          pnsetsource[arraysizesource][0]= std::atoi(a);
+          pnsetsource[arraysizesource][0]= std::stoi(a);
           pnsetsource[arraysizesource][1]--;
           arraysizesource++;
           setsizesource--;
@@ -145,7 +145,7 @@ public:
       else{
         find=false;
         for(int i=0; i<arraysizeremote; i++){
-          if(pnsetremote[i][0]==std::atoi(a)){
+          if(pnsetremote[i][0]==std::stoi(a)){
             pnsetremote[i][1]--;
             setsizeremote--;
             find=true;
@@ -153,7 +153,7 @@ public:
           }
         }
         if(!find){
-          pnsetremote[arraysizeremote][0]= std::atoi(a);
+          pnsetremote[arraysizeremote][0]= std::stoi(a);
           pnsetremote[arraysizeremote][1]--;
           arraysizeremote++;
           setsizeremote--;
