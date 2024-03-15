@@ -49,8 +49,8 @@ public:
     PNSet(PNSet &obj) : ReplicatedObject(obj)
     {
       //state
-      pnsetsource= obj.pnsetsource;
-      pnsetremote= obj.pnsetremote;
+      std::memcpy(pnsetsource, obj.pnsetsource, sizeof(pnsetsource));
+      std::memcpy(pnsetremote, obj.pnsetremote, sizeof(pnsetremote));
       arraysizesource= obj.arraysizesource;
       arraysizeremote= obj.arraysizeremote;
       setsizesource=obj.setsizesource;
