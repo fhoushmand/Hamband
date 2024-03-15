@@ -49,7 +49,7 @@ public:
     PNSet(PNSet &obj) : ReplicatedObject(obj)
     {
       //state
-      pnset = obj.addset;
+      std::memcpy(pnset, obj.pnset, sizeof(pnset));
       arraysize = obj.arraysize;
       setsize= obj.setsize;
       //removeset = obj.removeset;
