@@ -13,6 +13,7 @@
 #include "../benchmark/courseware.hpp"
 #include "../benchmark/project.hpp"
 #include "../benchmark/movie.hpp"
+#include "../benchmark/rubis.hpp"
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -36,7 +37,7 @@ int main(int argc, char* argv[]) {
   std::cout << "write precentage: "
             << static_cast<double>(write_percentage / 100) << std::endl;
   std::string loc =
-      "/rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/";
+      "/users/jsaber/binHamband/workload/";
   loc += std::to_string(nr_procs) + "-" + std::to_string(num_ops) + "-" +
          std::to_string(static_cast<int>(write_percentage));
   loc += "/" + usecase + "/";
@@ -59,7 +60,9 @@ int main(int argc, char* argv[]) {
     object = new BankAccount(100000);
   } else if (usecase == "movie") {
     object = new Movie();
-  } else if (usecase == "courseware") {
+  } else if (usecase == "rubis") {
+    object = new Rubis();
+  }else if (usecase == "courseware") {
     object = new Courseware();
     // init object
     for (int i = 0; i < 1000; i++) {
