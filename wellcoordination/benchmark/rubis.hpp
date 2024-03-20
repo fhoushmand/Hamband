@@ -132,7 +132,8 @@ public:
         storeBuyNow(s_id, value);
         break;
       }
-      case MethodType::REGISTER_USER{
+      case MethodType::REGISTER_USER:
+      {
         registeruser(std::stoi(call.arg));
         break;
       }
@@ -144,7 +145,7 @@ public:
         index = sub_arg.find_first_of('-');
         int u_id = std::stoi(sub_arg.substr(0, index));
         int value = std::stoi(sub_arg.substr(index + 1, sub_arg.length()));
-        placeBid(a_id, u_id, value)
+        placeBid(a_id, u_id, value);
         break;
       }
       case MethodType::QUERY:
