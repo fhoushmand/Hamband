@@ -120,13 +120,13 @@ public:
         size_t index = call.arg.find_first_of('-');
         int s_id = std::stoi(call.arg.substr(0, index));
         int value = std::stoi(call.arg.substr(index + 1, call.arg.length()));
-        sellItem(int s_id, int value);
+        sellItem(s_id, value);
         break;
       case MethodType::STORE_BUY_NOW:
         size_t index = call.arg.find_first_of('-');
         int s_id = std::stoi(call.arg.substr(0, index));
         int value = std::stoi(call.arg.substr(index + 1, call.arg.length()));
-        storeBuyNow(int s_id, int value);
+        storeBuyNow(s_id, value);
         break;
       case MethodType::REGISTER_USER:
         registeruser(std::stoi(call.arg));
