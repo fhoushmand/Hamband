@@ -48,27 +48,27 @@ include_directories("/rhome/fhous001/farzin/vcpkg/packages/libcds_x64-linux/inlc
 #    mu-main.cpp
 #)
 
-#add_executable(
-#    band
-#    band-main.cpp
-#)
+add_executable(
+    band
+    band-main.cpp
+)
 
 #add_executable(
 #    band-failure
 #    band-main-failure.cpp
 #)
 
-add_executable(
-    band-crdt
-    band-main-crdt.cpp
-)
+#add_executable(
+#    band-crdt
+#    band-main-crdt.cpp
+#)
 
 
 set(LibCDS_DIR "/rhome/fhous001/farzin/vcpkg/packages/libcds_x64-linux/share/libcds")
 find_package(LibCDS CONFIG REQUIRED)
 
-#target_link_libraries(band ${CONAN_LIBS} pthread)
+target_link_libraries(band ${CONAN_LIBS} pthread)
 #target_link_libraries(band-failure ${CONAN_LIBS} pthread)
-target_link_libraries(band-crdt ${CONAN_LIBS} pthread junction turf LibCDS::cds-s)
+#target_link_libraries(band-crdt ${CONAN_LIBS} pthread junction turf LibCDS::cds-s)
 #target_link_libraries(mu ${CONAN_LIBS} pthread)
 
