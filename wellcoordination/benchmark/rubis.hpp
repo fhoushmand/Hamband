@@ -20,7 +20,9 @@ class Rubis : public ReplicatedObject
 //registerUser 2   1(id)       by leader
 //openAuction    1(id)        by default consider 100 auctions are open. 
 //placeBid 3      3(auctionid+userid+value)
-//query 4  like movie does not consider read. 
+//openauction 4
+//closeauction
+//query 6  like movie does not consider read. 
 private:
     
 public:
@@ -96,7 +98,9 @@ public:
     // 0
     void sellItem(int s_id, int value)
     {
-      auction[s_id][0]=value;
+      if(auction[a_id][3]==1){
+        auction[s_id][0]=value;
+      }
     }
     // 1
     void storeBuyNow(int s_id, int value)
@@ -113,7 +117,7 @@ public:
     // 3
     void placeBid(int a_id, int u_id, int value)
     {
-      if(registeredusers[u_id]){
+      if(registeredusers[u_id] && auction[a_id][3]==1){
         if(auction[a_id][2]<value){
           auction[a_id][1]=u_id;
           auction[a_id][2]=value;
@@ -123,8 +127,10 @@ public:
 
     void openAction(int a_id, int stock)
     {
+      if(auction[a_id][3]==0){
         auction[a_id][0]=stock;
         auction[a_id][3]=1;
+      }
     }
     void closeAction(int a_id)
     {
