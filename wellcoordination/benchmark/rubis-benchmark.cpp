@@ -16,7 +16,7 @@
 
 int main(int argc, char* argv[]) {
   std::string loc =
-      "/users/jsaber/binHamband/workload/";
+      "/home/prithviraj/Documents/Hamband/wellcoordination/workload/";
 
   int nr_procs = static_cast<int>(std::atoi(argv[1]));
   int num_ops = static_cast<int>(std::atoi(argv[2]));
@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
   int queries = num_ops - total_writes;
 
   int num_conflicting_write_methods = 2;
-  int num_nonconflicting_write_methods = 2;
+  int num_nonconflicting_write_methods = 3;
   int num_read_methods = 0;
 
   std::cout << "ops: " << num_ops << std::endl;
@@ -81,6 +81,10 @@ int main(int argc, char* argv[]) {
       expected_nonconflicting_write_calls_per_follower *
           num_nonconflicting_write_methods * (nr_procs - 1);
 
+
+
+  std::vector<std::string>* open = new std::vector<std::string>[nr_procs];
+
   // first allocating writes operations to the nodes
   for (int i = 1; i <= num_replicas; i++) {
     // first leader
@@ -89,11 +93,12 @@ int main(int argc, char* argv[]) {
         int count = 0;
         for (; count < expected_calls_per_update_method;) {
           // storeBuyNow
+          // Sell items with id 0 - 99. 
           std::string callStr;
           if (type == 0) {
-            std::string b_id = std::to_string(1 + std::rand() % 100);
+            std::string i_id = std::to_string(std::rand() % 100);
             std::string value = std::to_string(std::rand() % 1000);
-            callStr = "1 " + b_id + "-" + value;
+            callStr = "1 " + i_id + "-" + value;
           }
           MethodCall call = ReplicatedObject::createCall("id", callStr);
           if (test->isPermissible(call)) {
@@ -110,9 +115,10 @@ int main(int argc, char* argv[]) {
         int count = 0;
         for (; count < expected_calls_per_update_method;) {
           // registerUser
+          // add users from 100 - 199. 
           std::string callStr;
           if (type == 0) {
-            std::string u_id = std::to_string(1+ std::rand() % 100);
+            std::string u_id = std::to_string(100 + std::rand() % 100);
             callStr = "2 " + u_id;
           }
           MethodCall call = ReplicatedObject::createCall("id", callStr);
@@ -127,24 +133,37 @@ int main(int argc, char* argv[]) {
     // follower
     else {
       // non-conflicting write method
-      for (int type = 0; type <= 1; type++) {
+      for (int type = 0; type <= 2; type++) {
         for (int count = 0; count <
         expected_nonconflicting_write_calls_per_follower; count++) {
           std::string callStr;
           if (type == 0) {
-          // sellitem
-          std::string s_id = std::to_string(1+ std::rand() % 100);
+          // sellitem 
+          std::string s_id = std::to_string(100 + std::rand() % 100);
           std::string value = std::to_string(std::rand() % 1000);
           callStr = "0 " + s_id+ "-"+ value;
           }
           if (type == 1) {
           // placeBid
-          std::string a_id = std::to_string(1+ std::rand() % 100); //auction id
-          std::string u_id = std::to_string(1+ std::rand() % 100); //user id
+          // Bid with user id 0 - 99 and item id 0 - 99
+          std::string a_id = std::to_string(std::rand() % 100); //auction id
+          std::string u_id = std::to_string(std::rand() % 100); //user id
           std::string value = std::to_string(std::rand() % 1000); //bid value
 
           callStr = "3 " + a_id + "-" + u_id + "-" + value;
           }
+
+          if (type == 2) {
+            //Open Auctions
+            // Open 100 - 199, with different stock values
+            // Save the opened ids so we can close them after shuffling. 
+            std::string i_id = std::to_string(100 + std::rand() % 100); //auction id
+            std::string stock = std::to_string(1 + std::rand() % 1000); //stock
+
+            open[i - 1].push_back(i_id); 
+            callStr = "4 " + i_id + "-" + stock;
+          }
+
 
           MethodCall call = ReplicatedObject::createCall("id", callStr);
           test->execute(call);
@@ -170,6 +189,15 @@ int main(int argc, char* argv[]) {
     calls[i].insert(calls[i].begin(),
                     std::string("#" + std::to_string(write_calls)));
     std::random_shuffle(calls[i].begin() + 1, calls[i].end());
+
+    std::string callStr;
+    if (i != 0 && i != 1)
+      for (int count = 0; count < expected_nonconflicting_write_calls_per_follower; count++) {
+            //Close Auction (using the saved values we opened added to the end of the shuffled operations)
+            callStr = "5 " + open[i][count];
+            calls[i].push_back(callStr);
+      }
+
   }
 
   for (int i = 0; i < nr_procs; i++) {
