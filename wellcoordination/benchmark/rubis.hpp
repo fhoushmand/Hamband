@@ -98,7 +98,7 @@ public:
     // 0
     void sellItem(int s_id, int value)
     {
-      if(auction[a_id][3]==1){
+      if(auction[s_id][3]==1){
         auction[s_id][0]=value;
       }
     }
