@@ -37,7 +37,7 @@ public:
       QUERY = 6
     };
     std::atomic<int> auction [200][4]={{0}}; //auctionid-quantity-user propsed max value-max value -valid auction
-    bool registeredusers [200]={false};
+    std::atomic<bool> registeredusers [200]={false};
     int userscounter=0;
     //std::set<std::string> movies;
     //std::set<std::string> customers;
