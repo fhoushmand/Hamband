@@ -36,8 +36,11 @@ public:
       CLOSE_AUCTION=5,
       QUERY = 6
     };
-    std::atomic<int> auction [200][4]={{0}}; //auctionid-quantity-user propsed max value-max value -valid auction
-    std::atomic<bool> registeredusers [200]={false};
+    std::atomic<int> auction [200][2]={{0}}; //auctionid-user propsed max value-max value //item id eaqual to auciton id
+    std::atomic<int> directbuysell [200]= {0};
+    std::set<std::int> registeredusers;
+    std::set<std::int> openauctions;
+    std::set<std::int> closeauctions;
     int userscounter=0;
     //std::set<std::string> movies;
     //std::set<std::string> customers;
@@ -72,9 +75,8 @@ public:
       synch_groups.push_back(g2);
 
       for (int i = 0; i < 100; i++) {
-        auction[i][0] = 1000; 
-        auction[i][3] =1; //auctions that are open. 
-        registeredusers[i] = true; 
+        directbuysell[i] = 1000; 
+        registeredusers.insert(i);
       }
     }
 
@@ -82,10 +84,12 @@ public:
     {
       //state
       std::memcpy(auction, obj.auction, sizeof(auction));
-      std::memcpy(registeredusers, obj.registeredusers, sizeof(registeredusers));
+      std::memcpy(directbuysell, obj.directbuysell, sizeof(directbuysell));
+      registeredusers = obj.registeredusers;
+      openauctions= obj.openauctions;
+      closeauctions= obj.closeAction;
+      
       userscounter =obj.userscounter;
-      //auction = obj.auction;
-      //registeredusers = obj.registeredusers;
     }
 
     virtual void toString()
@@ -98,43 +102,47 @@ public:
     // 0
     void sellItem(int s_id, int value)
     {
-      if(auction[s_id][3]==1){
-        auction[s_id][0]=value;
+      if(registeredusers.count(s_id)==1){
+        directbuysell[s_id]=value;
       }
     }
     // 1
     void storeBuyNow(int s_id, int value)
     {
-      if (auction[s_id][0]>value)
-        auction[s_id][0]=auction[s_id][0]-value;
+      if (directbuysell[s_id]>value && registeredusers.count(s_id)==1 )
+        directbuysell[s_id]=directbuysell[s_id]-value;
     }
     // 2
     void registerUser(int u_id)
     {
-      registeredusers[u_id]=true;
-      userscounter++;
+      if(registeredusers.count(u_id)==0){
+        registeredusers.insert(u_id);
+        userscounter++;
+      }
     }
     // 3
     void placeBid(int a_id, int u_id, int value)
     {
-      if(registeredusers[u_id] && auction[a_id][3]==1){
-        if(auction[a_id][2]<value){
-          auction[a_id][1]=u_id;
-          auction[a_id][2]=value;
+      if(registeredusers.count(u_id)==1 && openauction.count(a_id)==1 && closeauction.count(a_id)==0){
+        if(auction[a_id][1]<value){
+          auction[a_id][0]=u_id;
+          auction[a_id][1]=value;
         }
       }
     }
 
     void openAction(int a_id, int stock)
     {
-      if(auction[a_id][3]==0){
+      if(openauction.count(a_id)==0 && closeauction.count(a_id)==0){
         auction[a_id][0]=stock;
-        auction[a_id][3]=1;
+        openauction.insert(a_id);
       }
     }
     void closeAction(int a_id)
     {
-        auction[a_id][3]=0;
+      if(openauction.count(a_id)==1 && closeauction.count(a_id)==0){
+        closeauction.insert(a_id);
+      }
     }
 
     Rubis query() { return *this; }
