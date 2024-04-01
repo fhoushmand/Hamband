@@ -87,7 +87,7 @@ public:
       std::memcpy(directbuysell, obj.directbuysell, sizeof(directbuysell));
       registeredusers = obj.registeredusers;
       openauctions= obj.openauctions;
-      closeauctions= obj.closeactions;
+      closeauctions= obj.closeauctions;
       
       userscounter =obj.userscounter;
     }
