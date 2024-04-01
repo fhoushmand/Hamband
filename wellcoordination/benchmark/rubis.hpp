@@ -20,7 +20,7 @@ class Rubis : public ReplicatedObject
 //registerUser 2   1(id)       by leader
 //openAuction    1(id)        by default consider 100 auctions are open. 
 //placeBid 3      3(auctionid+userid+value)
-//openauction 4
+//openauctions 4
 //closeauction
 //query 6  like movie does not consider read. 
 private:
@@ -38,9 +38,9 @@ public:
     };
     std::atomic<int> auction [200][2]={{0}}; //auctionid-user propsed max value-max value //item id eaqual to auciton id
     std::atomic<int> directbuysell [200]= {0};
-    std::set<std::int> registeredusers;
-    std::set<std::int> openauctions;
-    std::set<std::int> closeauctions;
+    std::set<int> registeredusers;
+    std::set<int> openauctions;
+    std::set<int> closeauctions;
     int userscounter=0;
     //std::set<std::string> movies;
     //std::set<std::string> customers;
@@ -87,7 +87,7 @@ public:
       std::memcpy(directbuysell, obj.directbuysell, sizeof(directbuysell));
       registeredusers = obj.registeredusers;
       openauctions= obj.openauctions;
-      closeauctions= obj.closeAction;
+      closeauctions= obj.closeactions;
       
       userscounter =obj.userscounter;
     }
@@ -123,7 +123,7 @@ public:
     // 3
     void placeBid(int a_id, int u_id, int value)
     {
-      if(registeredusers.count(u_id)==1 && openauction.count(a_id)==1 && closeauction.count(a_id)==0){
+      if(registeredusers.count(u_id)==1 && openauctions.count(a_id)==1 && closeauction.count(a_id)==0){
         if(auction[a_id][1]<value){
           auction[a_id][0]=u_id;
           auction[a_id][1]=value;
@@ -133,14 +133,14 @@ public:
 
     void openAction(int a_id, int stock)
     {
-      if(openauction.count(a_id)==0 && closeauction.count(a_id)==0){
+      if(openauctions.count(a_id)==0 && closeauction.count(a_id)==0){
         auction[a_id][0]=stock;
-        openauction.insert(a_id);
+        openauctions.insert(a_id);
       }
     }
-    void closeAction(int a_id)
+    void closeActions(int a_id)
     {
-      if(openauction.count(a_id)==1 && closeauction.count(a_id)==0){
+      if(openauctions.count(a_id)==1 && closeauction.count(a_id)==0){
         closeauction.insert(a_id);
       }
     }
@@ -194,7 +194,7 @@ public:
       }
       case MethodType::CLOSE_AUCTION:
       {
-        closeAction(std::stoi(call.arg));
+        closeActions(std::stoi(call.arg));
         break;
       }
       case MethodType::QUERY:
