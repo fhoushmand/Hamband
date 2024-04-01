@@ -21,7 +21,7 @@ class Rubis : public ReplicatedObject
 //openAuction    1(id)        by default consider 100 auctions are open. 
 //placeBid 3      3(auctionid+userid+value)
 //openauctions 4
-//closeauction
+//closeauctions
 //query 6  like movie does not consider read. 
 private:
     
@@ -123,7 +123,7 @@ public:
     // 3
     void placeBid(int a_id, int u_id, int value)
     {
-      if(registeredusers.count(u_id)==1 && openauctions.count(a_id)==1 && closeauction.count(a_id)==0){
+      if(registeredusers.count(u_id)==1 && openauctions.count(a_id)==1 && closeauctions.count(a_id)==0){
         if(auction[a_id][1]<value){
           auction[a_id][0]=u_id;
           auction[a_id][1]=value;
@@ -133,15 +133,15 @@ public:
 
     void openAction(int a_id, int stock)
     {
-      if(openauctions.count(a_id)==0 && closeauction.count(a_id)==0){
+      if(openauctions.count(a_id)==0 && closeauctions.count(a_id)==0){
         auction[a_id][0]=stock;
         openauctions.insert(a_id);
       }
     }
     void closeActions(int a_id)
     {
-      if(openauctions.count(a_id)==1 && closeauction.count(a_id)==0){
-        closeauction.insert(a_id);
+      if(openauctions.count(a_id)==1 && closeauctions.count(a_id)==0){
+        closeauctions.insert(a_id);
       }
     }
 
