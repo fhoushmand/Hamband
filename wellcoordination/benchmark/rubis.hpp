@@ -74,6 +74,11 @@ public:
       //g2.push_back(static_cast<int>(MethodType::REMOVE_CUSTOMER));
       synch_groups.push_back(g2);
 
+      std::vector<int> g3;
+      g3.push_back(static_cast<int>(MethodType::PLACE_BID));
+      g3.push_back(static_cast<int>(MethodType::CLOSE_AUCTION));
+      synch_groups.push_back(g3);
+
       for (int i = 0; i < 100; i++) {
         directbuysell[i] = 1000; 
         registeredusers.insert(i);
@@ -133,7 +138,7 @@ public:
 
     void openAction(int a_id, int stock)
     {
-      if(openauctions.count(a_id)==0 && closeauctions.count(a_id)==0){
+      if(openauctions.count(a_id)==0){
         auction[a_id][0]=stock;
         openauctions.insert(a_id);
       }
