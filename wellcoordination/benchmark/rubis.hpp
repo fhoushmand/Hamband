@@ -80,7 +80,8 @@ public:
       synch_groups.push_back(g3);
 
       for (int i = 0; i < 100; i++) {
-        directbuysell[i] = 1000; 
+        directbuysell[i] = 1000;
+        openauctions.insert(i);
         registeredusers.insert(i);
       }
     }

@@ -17,7 +17,7 @@
 
 int main(int argc, char* argv[]) {
   std::string loc =
-      "/home/prithviraj/Documents/Hamband/wellcoordination/workload/";
+      "/home/pyuvaraj/";
 
   int nr_procs = static_cast<int>(std::atoi(argv[1]));
   int num_ops = static_cast<int>(std::atoi(argv[2]));
@@ -94,11 +94,11 @@ int main(int argc, char* argv[]) {
         int count = 0;
         for (; count < expected_calls_per_update_method;) {
           // storeBuyNow
-          // Sell items with id 0 - 99. 
+          // Buy items with id 0 - 99. 0-5
           std::string callStr;
           if (type == 0) {
             std::string i_id = std::to_string(std::rand() % 100);
-            std::string value = std::to_string(std::rand() % 1000);
+            std::string value = std::to_string(std::rand() % 5);
             callStr = "1 " + i_id + "-" + value;
           }
           MethodCall call = ReplicatedObject::createCall("id", callStr);
@@ -136,8 +136,6 @@ int main(int argc, char* argv[]) {
       for (int type = 0; type <= 1; type++) {
         int count = 0;
         for (; count < expected_calls_per_update_method;) {
-          // registerUser
-          // add users from 100 - 199. 
           std::string callStr;
           if (type == 0) {
             // placeBid
@@ -150,11 +148,11 @@ int main(int argc, char* argv[]) {
           }
           if (type == 1) {
             //Close Auctions
-            std::string i_id = std::to_string(100 + std::rand() % 100); //auction id
+            std::string i_id = std::to_string(std::rand() % 100); //auction id
             //std::string stock = std::to_string(1 + std::rand() % 1000); //stock
 
             //open[i - 1].push_back(i_id); 
-            callStr = "5 " + i_id
+            callStr = "5 " + i_id;
           }
           MethodCall call = ReplicatedObject::createCall("id", callStr);
           if (test->isPermissible(call)) {
@@ -173,12 +171,11 @@ int main(int argc, char* argv[]) {
         expected_nonconflicting_write_calls_per_follower; count++) {
           std::string callStr;
           if (type == 0) {
-          // sellitem 
-          std::string s_id = std::to_string(100 + std::rand() % 100);
-          std::string value = std::to_string(std::rand() % 1000);
-          callStr = "0 " + s_id+ "-"+ value;
+            // sellitem 
+            std::string s_id = std::to_string(100 + std::rand() % 100);
+            std::string value = std::to_string(std::rand() % 1000);
+            callStr = "0 " + s_id+ "-"+ value;
           }
-
           if (type == 1) {
             //Open Auctions
             // Open 100 - 199, with different stock values
