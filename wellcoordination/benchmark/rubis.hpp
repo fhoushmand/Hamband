@@ -69,14 +69,16 @@ public:
       g1.push_back(static_cast<int>(MethodType::STORE_BUY_NOW));
       //g1.push_back(static_cast<int>(MethodType::REMOVE_MOVIE));
       synch_groups.push_back(g1);
+
+
       std::vector<int> g2;
-      g2.push_back(static_cast<int>(MethodType::REGISTER_USER));
-      //g2.push_back(static_cast<int>(MethodType::REMOVE_CUSTOMER));
+      g3.push_back(static_cast<int>(MethodType::PLACE_BID));
+      g3.push_back(static_cast<int>(MethodType::CLOSE_AUCTION));
       synch_groups.push_back(g2);
 
       std::vector<int> g3;
-      g3.push_back(static_cast<int>(MethodType::PLACE_BID));
-      g3.push_back(static_cast<int>(MethodType::CLOSE_AUCTION));
+      g2.push_back(static_cast<int>(MethodType::REGISTER_USER));
+      //g2.push_back(static_cast<int>(MethodType::REMOVE_CUSTOMER));
       synch_groups.push_back(g3);
 
       for (int i = 0; i < 100; i++) {
