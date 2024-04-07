@@ -17,7 +17,7 @@
 
 int main(int argc, char* argv[]) {
   std::string loc =
-      "/home/pyuvaraj/";
+      "/users/jsaber/binHamband/workload/";
 
   int nr_procs = static_cast<int>(std::atoi(argv[1]));
   int num_ops = static_cast<int>(std::atoi(argv[2]));
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
   for (int i = 1; i <= num_replicas; i++) {
     // first leader
     if (i == 1) {
-      for (int type = 0; type <= 0; type++) {
+      for (int type = 0; type <= 1; type++) {
         int count = 0;
         for (; count < expected_calls_per_update_method;) {
           // storeBuyNow
@@ -101,24 +101,7 @@ int main(int argc, char* argv[]) {
             std::string value = std::to_string(std::rand() % 5);
             callStr = "1 " + i_id + "-" + value;
           }
-          MethodCall call = ReplicatedObject::createCall("id", callStr);
-          if (test->isPermissible(call)) {
-            test->execute(call);
-            calls[i - 1].push_back(callStr);
-            count++;
-          }
-        }
-      }
-    }
-    // second leader
-    else if (i == 2) {
-      for (int type = 0; type <= 0; type++) {
-        int count = 0;
-        for (; count < expected_calls_per_update_method;) {
-          // registerUser
-          // add users from 100 - 199. 
-          std::string callStr;
-          if (type == 0) {
+          if (type == 1) {
             std::string u_id = std::to_string(100 + std::rand() % 100);
             callStr = "2 " + u_id;
           }
@@ -131,8 +114,9 @@ int main(int argc, char* argv[]) {
         }
       }
     }
-    // third leader
-    else if (i == 3) {
+
+    // second leader
+    else if (i == 2) {
       for (int type = 0; type <= 1; type++) {
         int count = 0;
         for (; count < expected_calls_per_update_method;) {
