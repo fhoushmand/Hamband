@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
         count < expected_nonconflicting_write_calls_per_node; count++) {
       std::string callStr;
       // registerStudent
-      std::string s_id = std::to_string(std::rand() % 1000000);
+      std::string s_id = std::to_string(std::rand() % 100000);
       if(std::rand() %2==0)
         callStr = "0 " + s_id;
       else 
