@@ -14,6 +14,7 @@
 #include "../benchmark/project.hpp"
 #include "../benchmark/movie.hpp"
 #include "../benchmark/rubis.hpp"
+#include "../benchmark/kv-store.hpp"
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -62,6 +63,8 @@ int main(int argc, char* argv[]) {
     object = new Movie();
   } else if (usecase == "rubis") {
     object = new Rubis();
+  } else if (usecase == "kvstore") {
+    object = new KvStore();
   }else if (usecase == "courseware") {
     object = new Courseware();
     // init object
