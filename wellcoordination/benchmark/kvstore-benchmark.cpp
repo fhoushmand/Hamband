@@ -4,7 +4,7 @@
 #include <string>
 #include <thread>
 
-#include "../src/replicated_object.hpp"
+#include "kv-store.hpp"
 
 int main(int argc, char* argv[]) {
   std::string loc =
