@@ -24,7 +24,7 @@ public:
         update_methods.push_back(static_cast<int>(MethodType::PUT));
 
         method_args.insert(std::make_pair(static_cast<int>(MethodType::PUT), 2));
-        method_args.insert(std::make_pair(static_cast<int>(MethodType::GET), 0));
+        method_args.insert(std::make_pair(static_cast<int>(MethodType::GET), 1));
 
         std::vector<int> g1;
         g1.push_back(static_cast<int>(MethodType::PUT));
@@ -51,7 +51,12 @@ public:
         keysvalues[k].store(v, std::memory_order_relaxed);
     }
 
-    KvStore& get() { return *this; }
+    void get(const std::string &key) {
+        int k = std::stoi(key);
+        int v = keysvalues[k].load(std::memory_order_relaxed);
+        //std::cout << "key: " << k << ", value: " << v << std::endl;
+        //return *this;
+    }
 
     virtual ReplicatedObject* execute(MethodCall call) {
         switch (static_cast<MethodType>(call.method_type)) {
@@ -62,8 +67,12 @@ public:
             put(key, value);
             break;
         }
-        case MethodType::GET:
-            return this;
+        case MethodType::GET: {
+            std::string key = call.arg;
+            get(key);
+            break;
+        }
+            //return this;
         default:
             std::cout << "wrong method name" << std::endl;
             break;
