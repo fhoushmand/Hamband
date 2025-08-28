@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     calls[i] = std::vector<std::string>();
   }
 
-  BankAccount* test = new BankAccount(100000);
+  KvStore* test = new KvStore();
   // MethodCallFactory factory = MethodCallFactory(test, nr_procs);
 
   write_percentage /= 100;
