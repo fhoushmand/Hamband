@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdarg>
 #include <cstring>
+#include <atomic>
 
 #include "../src/replicated_object.hpp"
 
@@ -11,82 +12,66 @@ typedef unsigned char uint8_t;
 
 class KvStore : public ReplicatedObject
 {
-private:
-    
 public:
+    enum MethodType { PUT = 0, GET = 1 };
 
-    enum MethodType{
-      PUT = 0,
-      GET = 1
-    };
+    std::vector<std::atomic<int>> keysvalues;
 
-    std::vector<std::atomic<int>> keysvalues (1000000);
-    KvStore()
-    {
-      read_methods.push_back(static_cast<int>(MethodType::GET));
-      
-      update_methods.push_back(static_cast<int>(MethodType::PUT));
+    KvStore() : keysvalues(1000000) {
+        for (auto &a : keysvalues) a.store(0, std::memory_order_relaxed);
 
-      method_args.insert(std::make_pair(static_cast<int>(MethodType::PUT), 2));
-      method_args.insert(std::make_pair(static_cast<int>(MethodType::GET), 0));
-      
-      // conflicts
-      std::vector<int> g1;
-      g1.push_back(static_cast<int>(MethodType::PUT));
-      synch_groups.push_back(g1);
-      
-      // dependencies
-      //std::vector<int> d1;
-      //d1.push_back(static_cast<int>(MethodType::DEPOSIT));
-      //dependency_relation.insert(std::make_pair(static_cast<int>(MethodType::PUT), d1));
+        read_methods.push_back(static_cast<int>(MethodType::GET));
+        update_methods.push_back(static_cast<int>(MethodType::PUT));
+
+        method_args.insert(std::make_pair(static_cast<int>(MethodType::PUT), 2));
+        method_args.insert(std::make_pair(static_cast<int>(MethodType::GET), 0));
+
+        std::vector<int> g1;
+        g1.push_back(static_cast<int>(MethodType::PUT));
+        synch_groups.push_back(g1);
     }
 
-     // Courseware(const Courseware&) = delete;
-    KvStore(KvStore &obj) : ReplicatedObject(obj)
-    {
-      //state
-      this->keysvalues = obj.keysvalues.load();
+    // Copy-ctor: deep-copy atomics by load/store
+    KvStore(const KvStore &obj) : ReplicatedObject(obj), keysvalues(obj.keysvalues.size()) {
+        for (size_t i = 0; i < keysvalues.size(); ++i) {
+            keysvalues[i].store(obj.keysvalues[i].load(std::memory_order_relaxed),
+                                std::memory_order_relaxed);
+        }
     }
 
-    virtual void toString()
-    {
-      std::cout << "keys values size: " << keysvalues.size() << std::endl;
+    virtual void toString() {
+        std::cout << "keys values size: " << keysvalues.size() << std::endl;
     }
 
-    ~KvStore(){}
+    ~KvStore() {}
 
-    void put(std::string key, std::string value)
-    {
-      int k = std::stoi(key);
-      int v = std::stoi(value);
-      keysvalues[k].store(value, std::memory_order_relaxed);
+    void put(const std::string &key, const std::string &value) {
+        int k = std::stoi(key);
+        int v = std::stoi(value);
+        keysvalues[k].store(v, std::memory_order_relaxed);
     }
-    KvStore get() { return *this;}
 
-    virtual ReplicatedObject* execute(MethodCall call)
-    {
-      switch (static_cast<MethodType>(call.method_type))
-      {
-      case MethodType::PUT:
-      {
-        size_t index = call.arg.find_first_of('-');
-        std::string key = call.arg.substr(0, index);
-        std::string value = call.arg.substr(index + 1, call.arg.length());
-        put(key, value);
-        break;
-      }
-      case MethodType::GET:
+    KvStore& get() { return *this; }
+
+    virtual ReplicatedObject* execute(MethodCall call) {
+        switch (static_cast<MethodType>(call.method_type)) {
+        case MethodType::PUT: {
+            size_t index = call.arg.find_first_of('-');
+            std::string key = call.arg.substr(0, index);
+            std::string value = call.arg.substr(index + 1);
+            put(key, value);
+            break;
+        }
+        case MethodType::GET:
+            return this;
+        default:
+            std::cout << "wrong method name" << std::endl;
+            break;
+        }
         return this;
-        break;
-      default:
-        std::cout << "wrong method name" << std::endl;
-        break;
-      }
-      return this;
     }
 
-    virtual bool isPermissible(MethodCall call)
-    {
-      return true;
+    virtual bool isPermissible(MethodCall /*call*/) {
+        return true;
     }
 };
