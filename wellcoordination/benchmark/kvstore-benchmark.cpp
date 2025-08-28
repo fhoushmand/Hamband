@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
     std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
 
   while (calls[0].size() > calls[1].size() && read_calls != 0) {
-    calls[(index % (nr_procs - 1)) + 1].push_back(std::string("1"));
+    calls[(index % (nr_procs - 1)) + 1].push_back(std::string("1 " + std::to_string(std::rand() % 1000000)));
     read_calls--;
     index++;
   }
@@ -124,7 +124,7 @@ int main(int argc, char* argv[]) {
   if (read_calls != 0) {
     for (int i = 0; i < nr_procs; i++)
       for (int j = 0; j < read_calls / nr_procs; j++)
-        calls[i].push_back(std::string("1"));
+        calls[i].push_back(std::string("1 " + std::to_string(std::rand() % 1000000)));
     std::cout << "after adding reads to all" << std::endl;
     for (int i = 0; i < nr_procs; i++)
       std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
