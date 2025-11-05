@@ -38,13 +38,13 @@ int main(int argc, char* argv[]) {
   std::cout << "write precentage: "
             << static_cast<double>(write_percentage / 100) << std::endl;
   std::string loc =
-      "/users/jsaber/binHamband/workload/";
+      "/scratch/user/u.js213354/Hamband/wellcoordination/workload/";
   loc += std::to_string(nr_procs) + "-" + std::to_string(num_ops) + "-" +
          std::to_string(static_cast<int>(write_percentage));
   loc += "/" + usecase + "/";
 
   
-
+  std::cout<<"seg0"<<std::endl;
   // Build the list of remote ids
   std::vector<int> remote_ids;
   for (int i = 0, min_id = minimum_id; i < nr_procs; i++, min_id++) {
@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
       remote_ids.push_back(min_id);
     }
   }
-
+  std::cout<<"seg1"<<std::endl;	
 
   ReplicatedObject* object = NULL;
   if (usecase == "account") {
@@ -92,14 +92,14 @@ int main(int argc, char* argv[]) {
   NB_Wellcoordination protocol(id, remote_ids, object);
   std::this_thread::sleep_for(std::chrono::seconds(10));
   protocol.rb->hb_active.store(true);
-
+  std::cout<<"seg3"<<std::endl;
   int call_id = 0;
   int sent = 0;
   std::string line;
   int expected_calls = 0;
   std::ifstream myfile;
   myfile.open((loc + std::to_string(id) + ".txt").c_str());
-
+  std::cout<<"seg4"<<std::endl;
   std::vector<MethodCall> requests;
   while (getline(myfile, line)) {
     if (unlikely(line.at(0) == '#')) {

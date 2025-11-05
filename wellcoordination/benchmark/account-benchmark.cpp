@@ -8,7 +8,7 @@
 
 int main(int argc, char* argv[]) {
   std::string loc =
-      "/rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/";
+      "/scratch/user/u.js213354/Hamband/wellcoordination/workload/";
 
   int nr_procs = static_cast<int>(std::atoi(argv[1]));
   int num_ops = static_cast<int>(std::atoi(argv[2]));

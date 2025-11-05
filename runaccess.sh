@@ -1,18 +1,19 @@
 #!/bin/bash
-#SBATCH --nodes=5
-#SBATCH --ntasks=5
+#SBATCH --nodes=4
+#SBATCH --ntasks=4
 #SBATCH --cpus-per-task=4
 #SBATCH --output="result.log"
 #SBATCH --mem=64G
-#SBATCH -p short # This is the default partition, you can use any of the following; intel, batch, highmem, gpu
+#SBATCH --time=00:15:00     # HH:MM:SS or D-HH:MM:SS
+#SBATCH --partition=cpu
 nodes=($( scontrol show hostnames $SLURM_NODELIST ))
 nnodes=${#nodes[@]}
 last=$(( $nnodes - 1 ))
 DORY_HOME="/scratch/user/u.js213354/Hamband/"
 RESULT_LOC="/scratch/user/u.js213354/Hamband/wellcoordination/workload/"
 RESULTS_DIR_NAME="AE_results"
-NUM_OPS=1000000
-WRITE_PERC="15 20 25"
+NUM_OPS=400000
+WRITE_PERC="10"
 MODE="band" # mu, band, band-crdt, band-crdt-failure band-failure
 REP=1 # number of reps
 USECASE="account" # name of the usecase: project, courseware, movie, gset, counter
@@ -29,7 +30,7 @@ fi
 if [ "$FAILURE" -eq 2 ]; then
     CRASH="follower"
 fi
-for n in $( seq 4 4 ); do
+for n in $( seq 3 3 ); do
         for p in $WRITE_PERC; do
                 BENCH_DIRECTORY=$RESULT_LOC$n-$NUM_OPS-$p/$USECASE;
                 echo $BENCH_DIRECTORY;
@@ -49,13 +50,13 @@ echo $hostlist
 mkdir -p $BENCH_DIRECTORY/$RESULTS_DIR_NAME;
 ip0=$(ping -c 1 ${nodes[0]} | grep 'PING' | awk -F'[()]' '{print $2}')
 r=1
-for n in $( seq 4 4 ); do
+for n in $( seq 3 3 ); do
         for p in $WRITE_PERC; do
                 ssh ${nodes[0]} 'memcached -vv -p 9999'&
                 sleep 2;
                 for i in $( seq 1 $n ); do
-                        printf "ssh ${nodes[$i]} 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${ip0}:9999; ./bin/$MODE $i $n $NUM_OPS $p $USECASE $THROUGHPUT $FAILURE > $RESULT_LOC$n-$NUM_OPS-$p/$USECASE/$RESULTS_DIR_NAME/$MODE-$i-$r-$EXECUTION-$CRASH.log'\n"
-                        ssh ${nodes[$i]} "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${ip0}:9999; ./bin/$MODE $i $n $NUM_OPS $p $USECASE $THROUGHPUT $FAILURE > $RESULT_LOC$n-$NUM_OPS-$p/$USECASE/$RESULTS_DIR_NAME/$MODE-$i-$r-$EXECUTION-$CRASH.log"&
+                        printf "ssh ${nodes[$i]} 'cd ${DORY_HOME}; export DORY_REGISTRY_IP=${ip0}:9999; ./wellcoordination/build/bin/$MODE $i $n $NUM_OPS $p $USECASE $THROUGHPUT $FAILURE > $RESULT_LOC$n-$NUM_OPS-$p/$USECASE/$RESULTS_DIR_NAME/$MODE-$i-$r-$EXECUTION-$CRASH.log'\n"
+                        ssh ${nodes[$i]} "cd ${DORY_HOME}; export DORY_REGISTRY_IP=${ip0}:9999; ./wellcoordination/build/bin/$MODE $i $n $NUM_OPS $p $USECASE $THROUGHPUT $FAILURE > $RESULT_LOC$n-$NUM_OPS-$p/$USECASE/$RESULTS_DIR_NAME/$MODE-$i-$r-$EXECUTION-$CRASH.log"&
                 done
                 sleep 100;
                 ssh ${nodes[0]} "bash -s" <./kill-memcached.sh
