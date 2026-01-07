@@ -23,6 +23,11 @@ add_compile_options(-pthread)
 
 add_compile_options(-Wno-conversion)
 
+# --- MIN FIX (added): don’t let Junction/Turf warnings stop the build ---
+add_compile_options(-Wno-error=cast-qual -Wno-error=switch-default)
+add_compile_options(-Wno-cast-qual -Wno-switch-default)
+# -----------------------------------------------------------------------
+
 MESSAGE( STATUS "CMAKE_C_FLAGS: " ${CMAKE_C_FLAGS} )
 MESSAGE( STATUS "CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS} )
 MESSAGE( STATUS "CMAKE_BUILD_TYPE: " ${CMAKE_BUILD_TYPE} )
@@ -71,4 +76,3 @@ find_package(LibCDS CONFIG REQUIRED)
 #target_link_libraries(band-failure ${CONAN_LIBS} pthread)
 target_link_libraries(band-crdt ${CONAN_LIBS} pthread junction turf LibCDS::cds-s)
 #target_link_libraries(mu ${CONAN_LIBS} pthread)
-
