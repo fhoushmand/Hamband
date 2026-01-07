@@ -44,6 +44,6 @@ fi
 
 # ---------------------------------------------------------------------------
 
-conan install .. --build missing 
+conan install .. --build missing -s compiler.cppstd=17
 #--profile /rhome/fhous001/farzin/FastChain/dory/conan/profiles/gcc-debug.profile
 conan build ..
