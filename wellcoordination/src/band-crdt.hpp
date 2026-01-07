@@ -1,4 +1,5 @@
 #include <thread>
+#include <memory>
 
 #include <dory/shared/branching.hpp>
 
@@ -28,7 +29,8 @@ class BandCRDT {
     payload_buffer.resize(512);
     payload = &payload_buffer[0];
     
-    rb = std::make_unique<ReliableBroadcast>(id, remote_ids, repl_object);
+    rb = std::unique_ptr<ReliableBroadcast>(new ReliableBroadcast(id, remote_ids, repl_object));
+
   }
 
   ReplicatedObject* request(MethodCall request, bool debug, bool summarize) {
