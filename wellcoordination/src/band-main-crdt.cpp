@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
 
   int new_sent = 0;
   std::thread requestRedirector;
-  std::atomic<bool> own_requests_done = false;
+  std::atomic<bool> own_requests_done = {false};
   if(failed_node == 1 && id == failed_node + 1){
     requestRedirector = std::thread([&] {
       while (true) {

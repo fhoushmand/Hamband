@@ -10,6 +10,10 @@ else()
     message( STATUS "IPO / LTO not supported: <${error}>" )
 endif()
 
+# --- MIN FIX (added): enforce C++17 (needed for make_unique + structured bindings) ---
+set( CMAKE_CXX_STANDARD 17 )
+# ------------------------------------------------------------------------------------
+
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CONAN_SYSTEM_INCLUDES On )
 
@@ -44,7 +48,10 @@ add_subdirectory("../../junction" junction)
 
 # Set include dirs and libraries for the executable.
 include_directories(${JUNCTION_ALL_INCLUDE_DIRS})
-include_directories("/rhome/fhous001/farzin/vcpkg/packages/libcds_x64-linux/inlcude")
+
+# --- MIN FIX (changed): fix typo "inlcude" -> "include" ---
+include_directories("/rhome/fhous001/farzin/vcpkg/packages/libcds_x64-linux/include")
+# ----------------------------------------------------------
 
 
 
@@ -71,6 +78,14 @@ add_executable(
 
 set(LibCDS_DIR "/rhome/fhous001/farzin/vcpkg/packages/libcds_x64-linux/share/libcds")
 find_package(LibCDS CONFIG REQUIRED)
+
+# --- MIN FIX (added): LibCDS injects -std=c++11; remove it so project stays C++17 ---
+get_target_property(_libcds_opts LibCDS::cds-s INTERFACE_COMPILE_OPTIONS)
+if(_libcds_opts AND NOT _libcds_opts STREQUAL "_libcds_opts-NOTFOUND")
+  list(REMOVE_ITEM _libcds_opts "-std=c++11" "-std=gnu++11")
+  set_target_properties(LibCDS::cds-s PROPERTIES INTERFACE_COMPILE_OPTIONS "${_libcds_opts}")
+endif()
+# -------------------------------------------------------------------------------
 
 #target_link_libraries(band ${CONAN_LIBS} pthread)
 #target_link_libraries(band-failure ${CONAN_LIBS} pthread)
