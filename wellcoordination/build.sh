@@ -1,9 +1,12 @@
 #!/bin/bash
 set -e
 
-rm -rf build
-mkdir -p build
-pushd build >/dev/null
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SRC_DIR="${ROOT_DIR}/src"
+
+rm -rf "${ROOT_DIR}/build"
+mkdir -p "${ROOT_DIR}/build"
+pushd "${ROOT_DIR}/build" >/dev/null
 
 # --- Build-time linker stub for libibverbs (do NOT change LD_LIBRARY_PATH) ---
 STUB_DIR="/scratch/user/u.js213354/ibverbs-linkstub"
@@ -23,21 +26,21 @@ else
 fi
 # ---------------------------------------------------------------------------
 
-# 1) Conan deps (also tells conan we want C++17)
-conan install .. --build missing -s compiler.cppstd=17
+# Conan deps (run from ROOT so conanfile.py is found)
+pushd "${ROOT_DIR}" >/dev/null
+conan install . --build missing -s compiler.cppstd=17
+popd >/dev/null
 
-# 2) Force C++17 in CMake configure (THIS is what fixes make_unique + structured bindings)
+# Configure + build using the CMakeLists inside src/
 GEN=""
 command -v ninja >/dev/null 2>&1 && GEN="-G Ninja"
 
-cmake .. ${GEN} \
+cmake "${SRC_DIR}" ${GEN} \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_STANDARD=17 \
   -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-  -DCMAKE_CXX_EXTENSIONS=ON \
-  -DCMAKE_CXX_FLAGS="-std=gnu++17"
+  -DCMAKE_CXX_EXTENSIONS=ON
 
-# 3) Build
 cmake --build . -- -j"$(nproc)"
 
 popd >/dev/null
