@@ -1,46 +1,49 @@
 #!/bin/bash
-set -e
 
-ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SRC_DIR="${ROOT_DIR}/src"
+#set -e
 
-rm -rf "${ROOT_DIR}/build"
-mkdir -p "${ROOT_DIR}/build"
-pushd "${ROOT_DIR}/build" >/dev/null
+rm -rf build
+mkdir build
+pushd build
 
 # --- Build-time linker stub for libibverbs (do NOT change LD_LIBRARY_PATH) ---
+
 STUB_DIR="/scratch/user/u.js213354/ibverbs-linkstub"
+
 IBV_SO=""
 
+
+
+# common locations on RHEL/Ubuntu-style nodes
+
 for c in /usr/lib64/libibverbs.so.1 /usr/lib/x86_64-linux-gnu/libibverbs.so.1; do
+
   [[ -f "$c" ]] && { IBV_SO="$c"; break; }
+
 done
 
+
+
 if [[ -n "$IBV_SO" ]]; then
+
   mkdir -p "$STUB_DIR"
+
   ln -sf "$IBV_SO" "$STUB_DIR/libibverbs.so"
+
+  # point the linker at our stub (runtime stays on system .so.1)
+
   export LIBRARY_PATH="$STUB_DIR:${LIBRARY_PATH-}"
+
   echo "[build.sh] Using ibverbs stub -> $IBV_SO"
+
 else
+
   echo "[build.sh] WARNING: libibverbs.so.1 not found on this node; link may fail." >&2
+
 fi
+
 # ---------------------------------------------------------------------------
 
-# Conan deps (run from ROOT so conanfile.py is found)
-pushd "${ROOT_DIR}" >/dev/null
-conan install . --build missing -s compiler.cppstd=17
-popd >/dev/null
-
-# Configure + build using the CMakeLists inside src/
-GEN=""
-command -v ninja >/dev/null 2>&1 && GEN="-G Ninja"
-
-cmake "${SRC_DIR}" ${GEN} \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_STANDARD=17 \
-  -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-  -DCMAKE_CXX_EXTENSIONS=ON
-
-cmake --build . -- -j"$(nproc)"
-
-popd >/dev/null
+conan install .. --build missing 
+#--profile /rhome/fhous001/farzin/FastChain/dory/conan/profiles/gcc-debug.profile
+conan build ..
