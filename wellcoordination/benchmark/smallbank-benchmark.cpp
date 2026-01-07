@@ -4,11 +4,11 @@
 #include <string>
 #include <thread>
 
-#include "kv-store.hpp"
+#include "account.hpp"
 
 int main(int argc, char* argv[]) {
   std::string loc =
-      "/rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/";
+      "/scratch/user/u.js213354/Hamband/wellcoordination/workload/";
 
   int nr_procs = static_cast<int>(std::atoi(argv[1]));
   int num_ops = static_cast<int>(std::atoi(argv[2]));
@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
 
   loc += std::to_string(nr_procs) + "-" + std::to_string(num_ops) + "-" +
          std::to_string(static_cast<int>(write_percentage));
-  loc += "/kvstore/";
+  loc += "/account/";
 
   std::ofstream* outfile = new std::ofstream[nr_procs];
   std::vector<std::string>* calls = new std::vector<std::string>[nr_procs];
@@ -25,14 +25,16 @@ int main(int argc, char* argv[]) {
     outfile[i].open(loc + std::to_string(i + 1) + ".txt", std::ios_base::app);
     calls[i] = std::vector<std::string>();
   }
-  KvStore* test = new KvStore();
-  
+
+  BankAccount* test = new BankAccount(100000);
+  // MethodCallFactory factory = MethodCallFactory(test, nr_procs);
+
   write_percentage /= 100;
   int num_replicas = nr_procs;
   double total_writes = num_ops * write_percentage;
   int queries = num_ops - total_writes;
 
-  int num_conflicting_write_methods = 0;
+  int num_conflicting_write_methods = 1;
   int num_nonconflicting_write_methods = 1;
   int num_read_methods = 1;
 
@@ -53,36 +55,62 @@ int main(int argc, char* argv[]) {
             << expected_calls_per_update_method * num_conflicting_write_methods
             << std::endl;
 
-  int expected_nonconflicting_write_calls_per_node =
+  int expected_nonconflicting_write_calls_per_follower =
       (total_writes -
        expected_calls_per_update_method * num_conflicting_write_methods) /
-      (nr_procs);
+      (nr_procs - 1);
 
-  std::cout << "expected #calls per nonconflicting writes in nodes "
-            << expected_nonconflicting_write_calls_per_node << std::endl;
-  std::cout << "total nonconflicting #calls in nodes "
-            << expected_nonconflicting_write_calls_per_node *
-                   num_nonconflicting_write_methods * (nr_procs)
+  std::cout << "expected #calls per nonconflicting writes in follower "
+            << expected_nonconflicting_write_calls_per_follower << std::endl;
+  std::cout << "total nonconflicting #calls in followers "
+            << expected_nonconflicting_write_calls_per_follower *
+                   num_nonconflicting_write_methods * (nr_procs - 1)
             << std::endl;
 
   int write_calls =
       expected_calls_per_update_method * num_conflicting_write_methods +
-      expected_nonconflicting_write_calls_per_node *
-          num_nonconflicting_write_methods * (nr_procs);
+      expected_nonconflicting_write_calls_per_follower *
+          num_nonconflicting_write_methods * (nr_procs - 1);
 
   // first allocating writes operations to the nodes
   for (int i = 1; i <= num_replicas; i++) {
-    // non-conflicting write method
-    for (int count = 0;
-        count < expected_nonconflicting_write_calls_per_node; count++) {
-      std::string callStr;
-      std::string key = std::to_string(std::rand() % 1000000);
-      std::string value = std::to_string(std::rand() % 1000000);
-      callStr = "0 " + key + "-" + value;
+    // leader
+    if (i == 1) {
+      // conflicting calls are sent to the leader (first process) -- later this
+      // will change to handeling multiple leaders
+      for (int type = 0; type <= 0; type++) {
+        int count = 0;
+        for (; count < expected_calls_per_update_method;) {
+          std::string callStr;
+          // withdraw
+          if (type == 0) {
+            std::string c_id = std::to_string(std::rand() % 5);
+            callStr = "0 " + c_id;
+          }
 
-      MethodCall call = ReplicatedObject::createCall("id", callStr);
-      test->execute(call);
-      calls[i - 1].push_back(callStr);
+          MethodCall call = ReplicatedObject::createCall("id", callStr);
+          if (test->isPermissible(call)) {
+            test->execute(call);
+            calls[i - 1].push_back(callStr);
+            count++;
+          }
+        }
+      }
+    }
+    // follower
+    else {
+      // non-conflicting write method
+      for (int count = 0;
+           count < expected_nonconflicting_write_calls_per_follower; count++) {
+        std::string callStr;
+        // deposit
+        std::string s_id = std::to_string(std::rand() % 20);
+        callStr = "1 " + s_id;
+
+        MethodCall call = ReplicatedObject::createCall("id", callStr);
+        test->execute(call);
+        calls[i - 1].push_back(callStr);
+      }
     }
   }
 
@@ -90,6 +118,7 @@ int main(int argc, char* argv[]) {
   int q = num_ops - write_calls;
   std::cout << "q: " << q << std::endl;
 
+  // if(calls[0].size() > calls[1].size())
   int read_calls = q;
   int index = 0;
 
@@ -98,7 +127,7 @@ int main(int argc, char* argv[]) {
     std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
 
   while (calls[0].size() > calls[1].size() && read_calls != 0) {
-    calls[(index % (nr_procs - 1)) + 1].push_back(std::string("1 " + std::to_string(std::rand() % 1000000)));
+    calls[(index % (nr_procs - 1)) + 1].push_back(std::string("2"));
     read_calls--;
     index++;
   }
@@ -109,7 +138,7 @@ int main(int argc, char* argv[]) {
   if (read_calls != 0) {
     for (int i = 0; i < nr_procs; i++)
       for (int j = 0; j < read_calls / nr_procs; j++)
-        calls[i].push_back(std::string("1 " + std::to_string(std::rand() % 1000000)));
+        calls[i].push_back(std::string("2"));
     std::cout << "after adding reads to all" << std::endl;
     for (int i = 0; i < nr_procs; i++)
       std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
@@ -121,6 +150,7 @@ int main(int argc, char* argv[]) {
     std::random_shuffle(calls[i].begin() + 1, calls[i].end());
   }
 
+  //   // outfile.open(loc + std::to_string(i) + ".txt", std::ios_base::app);
   for (int i = 0; i < nr_procs; i++) {
     for (int x = 0; x < calls[i].size(); x++)
       outfile[i] << calls[i][x] << std::endl;

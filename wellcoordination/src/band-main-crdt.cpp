@@ -18,6 +18,7 @@
 #include "../benchmark/shop-crdt.hpp"
 #include "../benchmark/pnset-crdt.hpp"
 #include "../benchmark/twopset-crdt.hpp"
+#include "../benchmark/kv-store.hpp"
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -78,6 +79,8 @@ int main(int argc, char* argv[]) {
   else if(usecase == "twopset") {
     object = new TWOPSet();
   }
+  } else if (usecase == "kvstore") {
+    object = new KvStore();
   object->setID(id)->setNumProcess(nr_procs)->finalize();
   
   std::unordered_map<std::string, uint64_t>* response_times =
