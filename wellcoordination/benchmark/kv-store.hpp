@@ -20,7 +20,31 @@ class KvStore : public ReplicatedObject {
   struct ValTsAtomic {
     std::atomic<int> value{0};
     std::atomic<int> ts{0};
+
+    ValTsAtomic() = default;
+
+    // No copying
+    ValTsAtomic(const ValTsAtomic&) = delete;
+    ValTsAtomic& operator=(const ValTsAtomic&) = delete;
+
+    // Allow moving (vector needs this sometimes)
+    ValTsAtomic(ValTsAtomic&& other) noexcept {
+      value.store(other.value.load(std::memory_order_relaxed),
+                  std::memory_order_relaxed);
+      ts.store(other.ts.load(std::memory_order_relaxed),
+               std::memory_order_relaxed);
+    }
+    ValTsAtomic& operator=(ValTsAtomic&& other) noexcept {
+      if (this != &other) {
+        value.store(other.value.load(std::memory_order_relaxed),
+                    std::memory_order_relaxed);
+        ts.store(other.ts.load(std::memory_order_relaxed),
+                 std::memory_order_relaxed);
+      }
+      return *this;
+    }
   };
+
   std::vector<ValTsAtomic> localkeysvalues;
   std::vector<ValTsAtomic> keysvalues;
 
