@@ -4,6 +4,7 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <memory>
 
 #include <dory/store.hpp>
 
@@ -79,8 +80,9 @@ int main(int argc, char* argv[]) {
   else if(usecase == "twopset") {
     object = new TWOPSet();
   }
-  } else if (usecase == "kvstore") {
+  else if (usecase == "kvstore") {
     object = new KvStore();
+  }
   object->setID(id)->setNumProcess(nr_procs)->finalize();
   
   std::unordered_map<std::string, uint64_t>* response_times =
