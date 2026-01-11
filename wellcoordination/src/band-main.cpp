@@ -59,7 +59,9 @@ int main(int argc, char* argv[]) {
   ReplicatedObject* object = NULL;
   if (usecase == "account") {
     object = new BankAccount(100000);
-  } else if (usecase == "movie") {
+  } if (usecase == "smallbank") {
+    object = new SmallBank(100000, 100000000);
+  }else if (usecase == "movie") {
     object = new Movie();
   } else if (usecase == "rubis") {
     object = new Rubis();

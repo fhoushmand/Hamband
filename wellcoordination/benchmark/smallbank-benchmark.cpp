@@ -1,10 +1,14 @@
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <thread>
+#include <vector>
+#include <algorithm>
 
-#include "account.hpp"
+
+#include "smallbank.hpp"
 
 int main(int argc, char* argv[]) {
   std::string loc =
@@ -16,7 +20,7 @@ int main(int argc, char* argv[]) {
 
   loc += std::to_string(nr_procs) + "-" + std::to_string(num_ops) + "-" +
          std::to_string(static_cast<int>(write_percentage));
-  loc += "/account/";
+  loc += "/smallbank/";
 
   std::ofstream* outfile = new std::ofstream[nr_procs];
   std::vector<std::string>* calls = new std::vector<std::string>[nr_procs];
@@ -26,7 +30,7 @@ int main(int argc, char* argv[]) {
     calls[i] = std::vector<std::string>();
   }
 
-  BankAccount* test = new BankAccount(100000);
+  SmallBank* test = new SmallBank(100000, 100000000);
   // MethodCallFactory factory = MethodCallFactory(test, nr_procs);
 
   write_percentage /= 100;
@@ -84,8 +88,9 @@ int main(int argc, char* argv[]) {
           std::string callStr;
           // withdraw
           if (type == 0) {
+            std::string a_id = std::to_string(std::rand() % 100000000);
             std::string c_id = std::to_string(std::rand() % 5);
-            callStr = "0 " + c_id;
+            callStr = "0 " + a_id + "-" + c_id;
           }
 
           MethodCall call = ReplicatedObject::createCall("id", callStr);
@@ -104,8 +109,9 @@ int main(int argc, char* argv[]) {
            count < expected_nonconflicting_write_calls_per_follower; count++) {
         std::string callStr;
         // deposit
-        std::string s_id = std::to_string(std::rand() % 20);
-        callStr = "1 " + s_id;
+        std::string a_id = std::to_string(std::rand() % 100000000);
+        std::string c_id = std::to_string(std::rand() % 20);
+        callStr = "1 " + a_id + "-" + c_id;
 
         MethodCall call = ReplicatedObject::createCall("id", callStr);
         test->execute(call);
@@ -127,7 +133,9 @@ int main(int argc, char* argv[]) {
     std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
 
   while (calls[0].size() > calls[1].size() && read_calls != 0) {
-    calls[(index % (nr_procs - 1)) + 1].push_back(std::string("2"));
+    calls[(index % (nr_procs - 1)) + 1].push_back(std::string("2 ") +
+                                             std::to_string(std::rand() % 100000000));
+
     read_calls--;
     index++;
   }
@@ -138,7 +146,7 @@ int main(int argc, char* argv[]) {
   if (read_calls != 0) {
     for (int i = 0; i < nr_procs; i++)
       for (int j = 0; j < read_calls / nr_procs; j++)
-        calls[i].push_back(std::string("2"));
+        calls[i].push_back(std::string("2 ") + std::to_string(std::rand() % 100000000));
     std::cout << "after adding reads to all" << std::endl;
     for (int i = 0; i < nr_procs; i++)
       std::cout << i + 1 << " size: " << calls[i].size() << std::endl;
