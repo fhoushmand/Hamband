@@ -14,6 +14,7 @@
 #include "../benchmark/project.hpp"
 #include "../benchmark/movie.hpp"
 #include "../benchmark/rubis.hpp"
+#include "../benchmark/smallbank.hpp"
 
 
 int main(int argc, char* argv[]) {
