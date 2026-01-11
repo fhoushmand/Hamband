@@ -101,7 +101,7 @@ class SmallBank : public ReplicatedObject {
       size_t index = call.arg.find_first_of('-');
       std::string aid = call.arg.substr(0, index);
       std::string v = call.arg.substr(index + 1, call.arg.length());
-      if (v > accounts[std::stoi(aid)].load()) return false;
+      if (std::stoi(v) > accounts[std::stoi(aid)].load()) return false;
       return true;
     }
     return false;
