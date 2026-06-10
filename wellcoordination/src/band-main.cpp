@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
   if(id != 1)
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   store.set(std::to_string(id), "ready");
-  for(int i = 1; i < nr_procs; i++)
+  for(int i = 1; i <= nr_procs; i++)
   {
     std::string value;
     while (!store.get(std::to_string(i), value));
@@ -200,6 +200,14 @@ if(calculate_throughput) {
   //           << static_cast<double>(num_ops)/static_cast<double>(local_end - local_start) << std::endl;
   std::cout << "issued " << sent << " operations" << std::endl;
 
+  if (failed_node == 0 && usecase == "account" && id == 1) {
+    MethodCall flush_call = ReplicatedObject::createCall("flush", "0 0");
+    auto flush_response = protocol.request(flush_call, false, false);
+    if (flush_response.first != ResponseStatus::NoError) {
+      std::cout << "flush request failed" << std::endl;
+    }
+  }
+
   if(!calculate_throughput){
     double sum = 0;
     double total_sum = 0;
@@ -228,8 +236,12 @@ if(calculate_throughput) {
       for (int x = 0; x < nr_procs; x++) cs += protocol.repl_object->calls_applied[i][x];
     // std::cout << "received: " << cs << std::endl;
     if(sz == 1){
-      if (cs == ((id != 1) ? (expected_calls - 1) : expected_calls))
+      if (failed_node == 0) {
+        if (cs >= expected_calls)
+          break;
+      } else if (cs == ((id != 1) ? (expected_calls - 1) : expected_calls)) {
         break;
+      }
     }
     else{
       if (cs == ((id > sz) ? (expected_calls - sz) : expected_calls - 1))
@@ -244,6 +256,18 @@ if(calculate_throughput) {
   std::cout << "throughput: "
             << static_cast<double>(num_ops)/static_cast<double>(global_end - local_start) << std::endl;
 
-  std::this_thread::sleep_for(std::chrono::seconds(60));
-  return 0;
+  std::cout << "final state for node " << id << ":" << std::endl;
+  object->toString();
+  std::cout.flush();
+
+  store.set("finished-" + std::to_string(id), "ready");
+  for (int i = 1; i <= nr_procs; i++) {
+    std::string value;
+    while (!store.get("finished-" + std::to_string(i), value)) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+  }
+  std::cout << "all nodes finished" << std::endl;
+  std::cout.flush();
+  std::_Exit(0);
 }

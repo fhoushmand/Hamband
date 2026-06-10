@@ -1,3 +1,6 @@
 #!/bin/bash
 
-kill $(ps aux | grep '[m]emcached' | awk '{print $2}');
+pids=$(pgrep -u "$USER" -x memcached || true)
+if [ -n "$pids" ]; then
+  kill $pids
+fi
