@@ -19,6 +19,7 @@
 // #include "remote-log-reader.hpp"
 
 #include "fixed-size-majority.hpp"
+#include "strict-majority.hpp"
 
 namespace dory {
 class CatchUpWithFollowers {
@@ -35,7 +36,8 @@ class CatchUpWithFollowers {
       throw std::runtime_error("Advertised proposal number must be `uint64_t`");
     }
 
-    quorum_size = quorum::majority(c_ctx->remote_ids.size() + 1) - 1;
+    quorum_size = crash_consensus::remoteStrictMajority(
+        c_ctx->remote_ids.size());
     modulo = Identifiers::maxID(c_ctx->my_id, c_ctx->remote_ids);
 
     SequentialQuorumWaiter waiterRead(quorum::ProposalRd, c_ctx->remote_ids,

@@ -1,5 +1,7 @@
 #include "consensus.hpp"
 
+#include "strict-majority.hpp"
+
 #include <iostream>
 
 namespace dory {
@@ -189,7 +191,7 @@ void RdmaConsensus::run() {
   response_blocked = &(leader_election->response_blocked);
 
   // Initialize replication
-  auto quorum_size = quorum::majority(remote_ids.size() + 1) - 1;
+  auto quorum_size = crash_consensus::remoteStrictMajority(remote_ids.size());
   auto next_log_entry_offset = re_ctx->log.headerFirstUndecidedOffset();
 
   LOGGER_TRACE(logger, "My first undecided offset is {}",

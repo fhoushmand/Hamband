@@ -10,6 +10,7 @@
 #include "quorum-waiter.hpp"
 #include "timers.h"
 #include "leader.hpp"
+#include "strict-majority.hpp"
 
 namespace dory {
 template <class QuorumWaiter, class ErrorType>
@@ -20,14 +21,14 @@ class FixedSizeMajorityOperation {
                              std::vector<int> &remote_ids)
       : ctx{context}, qw{qw}, kind{qw.kindOfOp()} {
     quorum_size =
-        static_cast<int>(quorum::majority(ctx->remote_ids.size() + 1)) - 1;
+        crash_consensus::remoteStrictMajority(ctx->remote_ids.size());
     replicas_size = static_cast<int>(ctx->remote_ids.size());
 
     successful_ops.resize(remote_ids.size());
     successful_ops.clear();
 
-    int tolerated_failures =
-        static_cast<int>(quorum::minority(ctx->remote_ids.size() + 1));
+    int tolerated_failures = crash_consensus::toleratedFailures(
+        ctx->remote_ids.size() + 1);
     failed_majority = FailureTracker(kind, ctx->remote_ids, tolerated_failures);
     failed_majority.track(qw.reqID());
 
