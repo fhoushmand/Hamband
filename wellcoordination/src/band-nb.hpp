@@ -11,12 +11,25 @@ using namespace band;
 
 class NB_Wellcoordination : Synchronizer {
  public:
+  struct LatencyBreakdown {
+    uint64_t attempted = 0;
+    uint64_t no_error = 0;
+    uint64_t not_permissible = 0;
+    uint64_t dory_error = 0;
+    uint64_t total_ns = 0;
+    uint64_t mu_ns = 0;
+    uint64_t pre_mu_ns = 0;
+    uint64_t post_mu_ns = 0;
+  };
+
   int self;
   size_t num_process;
   std::vector<int> remote_ids;
   std::unique_ptr<ReliableBroadcast> rb;
   std::unique_ptr<dory::Consensus>* tob;
   ReplicatedObject* repl_object;
+  bool collect_latency_breakdown = false;
+  LatencyBreakdown leader_conflict_breakdown;
 
   void executeOrBlock(MethodCall call, bool leader, int l);
   bool checkCallDependencies(MethodCall callWithDeps);
@@ -55,6 +68,10 @@ class NB_Wellcoordination : Synchronizer {
   }
 
   virtual std::pair<ResponseStatus,std::chrono::high_resolution_clock::time_point> request(MethodCall request, bool debug, bool summarize) {
+    std::chrono::high_resolution_clock::time_point breakdown_start;
+    if (collect_latency_breakdown) {
+      breakdown_start = std::chrono::high_resolution_clock::now();
+    }
     // a query method
     // handle localy and do not propagate
     // std::cout << "request: " << request.id << std::endl;
@@ -71,10 +88,20 @@ class NB_Wellcoordination : Synchronizer {
     auto length = repl_object->serialize(request, payload);
     payload_buffer.resize(length);
     int synch_gp = repl_object->getSynchGroup(request.method_type);
+    bool collect_conflict_breakdown = collect_latency_breakdown && synch_gp != -1;
     
     if (!repl_object->isPermissible(request)) {
         std::cout << "not permissible, dropping request " << request.method_type << std::endl;
-        return response(request, ResponseStatus::NotPermissible, debug);
+        auto ret = response(request, ResponseStatus::NotPermissible, debug);
+        if (collect_conflict_breakdown) {
+          leader_conflict_breakdown.attempted++;
+          leader_conflict_breakdown.not_permissible++;
+          leader_conflict_breakdown.total_ns +=
+              std::chrono::duration_cast<std::chrono::nanoseconds>(
+                  ret.second - breakdown_start)
+                  .count();
+        }
+        return ret;
     }
     // non-conflicting calls
     // no need to defer the permissibility check
@@ -90,8 +117,19 @@ class NB_Wellcoordination : Synchronizer {
     }
     // conflicting call
     else {
+      if (collect_conflict_breakdown) {
+        leader_conflict_breakdown.attempted++;
+      }
+      std::chrono::high_resolution_clock::time_point before_mu;
+      if (collect_conflict_breakdown) {
+        before_mu = std::chrono::high_resolution_clock::now();
+      }
       dory::ProposeError err =
           tob[synch_gp]->propose(payload, payload_buffer.size());
+      std::chrono::high_resolution_clock::time_point after_mu;
+      if (collect_conflict_breakdown) {
+        after_mu = std::chrono::high_resolution_clock::now();
+      }
       // std::cout << "after propose" << std::endl;
       if (err != dory::ProposeError::NoError) {
         // request dropping, erasing it...
@@ -124,10 +162,50 @@ class NB_Wellcoordination : Synchronizer {
             std::cout << "Bug in code. You should only handle errors here"
                       << std::endl;
         }
-        return response(request, ResponseStatus::DoryError, false);
+        auto ret = response(request, ResponseStatus::DoryError, false);
+        if (collect_conflict_breakdown) {
+          leader_conflict_breakdown.dory_error++;
+          leader_conflict_breakdown.mu_ns +=
+              std::chrono::duration_cast<std::chrono::nanoseconds>(
+                  after_mu - before_mu)
+                  .count();
+          leader_conflict_breakdown.pre_mu_ns +=
+              std::chrono::duration_cast<std::chrono::nanoseconds>(
+                  before_mu - breakdown_start)
+                  .count();
+          leader_conflict_breakdown.post_mu_ns +=
+              std::chrono::duration_cast<std::chrono::nanoseconds>(
+                  ret.second - after_mu)
+                  .count();
+          leader_conflict_breakdown.total_ns +=
+              std::chrono::duration_cast<std::chrono::nanoseconds>(
+                  ret.second - breakdown_start)
+                  .count();
+        }
+        return ret;
       }
       // executed with no error - sending the response.
-      return response(request, ResponseStatus::NoError, debug);
+      auto ret = response(request, ResponseStatus::NoError, debug);
+      if (collect_conflict_breakdown) {
+        leader_conflict_breakdown.no_error++;
+        leader_conflict_breakdown.mu_ns +=
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                after_mu - before_mu)
+                .count();
+        leader_conflict_breakdown.pre_mu_ns +=
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                before_mu - breakdown_start)
+                .count();
+        leader_conflict_breakdown.post_mu_ns +=
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                ret.second - after_mu)
+                .count();
+        leader_conflict_breakdown.total_ns +=
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                ret.second - breakdown_start)
+                .count();
+      }
+      return ret;
     }
   }
 };

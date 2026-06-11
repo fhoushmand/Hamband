@@ -91,6 +91,8 @@ int main(int argc, char* argv[]) {
 
   auto& store = dory::MemoryStore::getInstance();
   NB_Wellcoordination protocol(id, remote_ids, object);
+  protocol.collect_latency_breakdown =
+      (!calculate_throughput && id == 1 && usecase == "account");
   std::this_thread::sleep_for(std::chrono::seconds(10));
   protocol.rb->hb_active.store(true);
   std::cout<<"seg3"<<std::endl;
@@ -201,6 +203,7 @@ if(calculate_throughput) {
   std::cout << "issued " << sent << " operations" << std::endl;
 
   if (failed_node == 0 && usecase == "account" && id == 1) {
+    protocol.collect_latency_breakdown = false;
     MethodCall flush_call = ReplicatedObject::createCall("flush", "0 0");
     auto flush_response = protocol.request(flush_call, false, false);
     if (flush_response.first != ResponseStatus::NoError) {
@@ -225,6 +228,62 @@ if(calculate_throughput) {
     }
     std::cout << "total average response time for " << num
               << " calls: " << (total_sum/1000) / static_cast<int>(num) << std::endl;
+
+    if (id == 1 && usecase == "account") {
+      auto& breakdown = protocol.leader_conflict_breakdown;
+      double conflict_sum_ns = 0;
+      for (auto& pair : response_times[BankAccount::MethodType::WITHDRAW]) {
+        conflict_sum_ns += static_cast<double>(pair.second);
+      }
+
+      double conflict_avg_us = breakdown.attempted == 0
+                                   ? 0
+                                   : (conflict_sum_ns / 1000) /
+                                         static_cast<double>(breakdown.attempted);
+      uint64_t proposed_conflicts = breakdown.no_error + breakdown.dory_error;
+      double mu_avg_us = proposed_conflicts == 0
+                             ? 0
+                             : (static_cast<double>(breakdown.mu_ns) / 1000) /
+                                   static_cast<double>(proposed_conflicts);
+      double non_mu_avg_us = conflict_avg_us - mu_avg_us;
+      double pre_mu_avg_us = proposed_conflicts == 0
+                                 ? 0
+                                 : (static_cast<double>(breakdown.pre_mu_ns) /
+                                    1000) /
+                                       static_cast<double>(proposed_conflicts);
+      double post_mu_avg_us = proposed_conflicts == 0
+                                  ? 0
+                                  : (static_cast<double>(breakdown.post_mu_ns) /
+                                     1000) /
+                                        static_cast<double>(proposed_conflicts);
+      double mu_percentage =
+          conflict_avg_us > 0 ? (mu_avg_us * 100) / conflict_avg_us : 0;
+      double non_mu_percentage =
+          conflict_avg_us > 0 ? (non_mu_avg_us * 100) / conflict_avg_us : 0;
+
+      std::cout << "leader conflicting calls attempted: "
+                << breakdown.attempted << std::endl;
+      std::cout << "leader conflicting calls processed: "
+                << breakdown.no_error << std::endl;
+      std::cout << "leader conflicting integrity drops: "
+                << breakdown.not_permissible << std::endl;
+      std::cout << "leader conflicting dory errors: "
+                << breakdown.dory_error << std::endl;
+      std::cout << "leader conflicting average response time: "
+                << conflict_avg_us << std::endl;
+      std::cout << "leader conflicting average mu time: " << mu_avg_us
+                << std::endl;
+      std::cout << "leader conflicting average non-mu time: "
+                << non_mu_avg_us << std::endl;
+      std::cout << "leader conflicting mu percentage: " << mu_percentage
+                << std::endl;
+      std::cout << "leader conflicting non-mu percentage: "
+                << non_mu_percentage << std::endl;
+      std::cout << "leader conflicting average pre-mu time: "
+                << pre_mu_avg_us << std::endl;
+      std::cout << "leader conflicting average post-mu time: "
+                << post_mu_avg_us << std::endl;
+    }
   }
 
   // wait for all the ops to arrive and then calculate throughput
