@@ -1,0 +1,48 @@
+c10 c13 c14 c15 c16 c17 c21
+ops: 100000
+write_perc: 0.25
+writes: 25000
+reads: 75000
+expected #calls per update method 12500
+expected #calls per nonconflicting writes in nodes 1785
+write calls issued: 24990
+read calls issued: 237300
+extra read calls needed: -162290
+after adding writes to nodes
+1 size: 37470
+2 size: 37470
+3 size: 37470
+4 size: 37470
+5 size: 37470
+6 size: 37470
+7 size: 37470
+after adding reads to all
+1 size: 37470
+2 size: 37470
+3 size: 37470
+4 size: 37470
+5 size: 37470
+6 size: 37470
+7 size: 37470
+expected calls to receive: 24990
+benchmark generated
+ssh c10.ib.hpcc.ucr.edu 'cd /rhome/fhous001/farzin/FastChain/dory/; ./tcpcrdt/build/tcp-main-crdt 1 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21  > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-1-1.log'
+ssh c13.ib.hpcc.ucr.edu 'cd /rhome/fhous001/farzin/FastChain/dory/; ./tcpcrdt/build/tcp-main-crdt 2 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21  > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-2-1.log'
+ssh c14.ib.hpcc.ucr.edu 'cd /rhome/fhous001/farzin/FastChain/dory/; ./tcpcrdt/build/tcp-main-crdt 3 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21  > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-3-1.log'
+ssh c15.ib.hpcc.ucr.edu 'cd /rhome/fhous001/farzin/FastChain/dory/; ./tcpcrdt/build/tcp-main-crdt 4 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21  > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-4-1.log'
+ssh c16.ib.hpcc.ucr.edu 'cd /rhome/fhous001/farzin/FastChain/dory/; ./tcpcrdt/build/tcp-main-crdt 5 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21  > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-5-1.log'
+ssh c17.ib.hpcc.ucr.edu 'cd /rhome/fhous001/farzin/FastChain/dory/; ./tcpcrdt/build/tcp-main-crdt 6 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21  > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-6-1.log'
+ssh c21.ib.hpcc.ucr.edu 'cd /rhome/fhous001/farzin/FastChain/dory/; ./tcpcrdt/build/tcp-main-crdt 7 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21  > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-7-1.log'
+terminate called after throwing an instance of 'amirmohsen::SocketClosedException*'
+terminate called after throwing an instance of 'amirmohsen::SocketClosedException*'
+terminate called after throwing an instance of 'amirmohsen::SocketClosedException*'
+terminate called after throwing an instance of 'amirmohsen::SocketClosedException*'
+terminate called after throwing an instance of 'amirmohsen::SocketClosedException*'
+terminate called after throwing an instance of 'amirmohsen::SocketClosedException*'
+bash: line 1: 928707 Aborted                 (core dumped) ./tcpcrdt/build/tcp-main-crdt 3 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21 > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-3-1.log
+bash: line 1: 1061883 Aborted                 (core dumped) ./tcpcrdt/build/tcp-main-crdt 5 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21 > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-5-1.log
+bash: line 1: 3981485 Aborted                 (core dumped) ./tcpcrdt/build/tcp-main-crdt 4 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21 > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-4-1.log
+bash: line 1: 2553881 Aborted                 (core dumped) ./tcpcrdt/build/tcp-main-crdt 7 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21 > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-7-1.log
+bash: line 1: 3495220 Aborted                 (core dumped) ./tcpcrdt/build/tcp-main-crdt 6 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21 > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-6-1.log
+bash: line 1: 880499 Aborted                 (core dumped) ./tcpcrdt/build/tcp-main-crdt 1 7 100000 25 orset c10 c13 c14 c15 c16 c17 c21 > /rhome/fhous001/farzin/FastChain/dory/wellcoordination/workload/7-100000-25/orset/results/tcp-1-1.log
+slurmstepd-c10: error: *** JOB 282455 ON c10 CANCELLED AT 2022-04-03T03:40:41 ***

@@ -1,0 +1,3 @@
+/rhome/fhous001/farzin/FastChain/dory/log/CMakeFiles/rebuild_cache.dir
+/rhome/fhous001/farzin/FastChain/dory/log/CMakeFiles/edit_cache.dir
+/rhome/fhous001/farzin/FastChain/dory/log/CMakeFiles/dorylog.dir

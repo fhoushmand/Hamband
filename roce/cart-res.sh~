@@ -1,0 +1,9 @@
+#!/bin/bash
+
+PERCENTAGES="5 15 25";
+
+for n in $( seq 3 7 ); do
+        for p in $PERCENTAGES; do
+		grep -r -w "total average" wellcoordination/workload/$n-4000000-$p/cart/results/* | sort -t: -n -k2 | awk '{split($0,a); count += 1; sum += a[8]} END {print sum/count;}';
+	done
+done

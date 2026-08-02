@@ -1,71 +1,47 @@
-# Hamband: RDMA replicated data types
+# Hamband
 
-The source code of Hamband is presented in this repository. 
+This repository contains two independent Hamband implementations in one
+`master` branch. Choose the directory that matches the RDMA transport for the
+experiment.
 
-## Getting Started
-This project needs several modules in order to run successfully. Load required modules with:
-```sh
-$ source load_modules.sh
+| Directory | Transport | Purpose |
+| --- | --- | --- |
+| [`infiniband/`](infiniband/) | InfiniBand | Preserved original implementation |
+| [`roce/`](roce/) | InfiniBand or RoCE | Validated RoCE-capable implementation |
+
+## Choosing a Version
+
+For the original ACES InfiniBand experiments:
+
+```bash
+cd infiniband
 ```
 
-## Compiling the source code
+For RoCE experiments:
 
-**Compiling benchmark of each use-case:** 
-This project considers several use cases. For each use case, we prepared a benchmark code. To compile the code of each benchmark go to the wellcoordination/src/ directory and compile each benchmark with:
-```sh
-$ g++ --std=c++17 usecase-benchmark.cpp -o usecase-benchmark.out
-```
-**Compiling the source code of RDMA-based use-cases:**
-In order to compile use-cases that will run with RDMA (Band and Mu), go to the wellcoordination directory and run:
-```sh
-$ source build.sh
-```
-**Compiling TCP Based CRDTS( Message passing):**
-In order to compile TCP-based CRDTs implementation go to the tcpcrdt and run:
-```sh
-$ source compile.sh
-```
-## Running the project
-For running the project on a cluster we prepared a script file. It should be noted that the cluster should support the RDMA connection between nodes and exploits Slurm cluster management. If the cluster does not exploit Slurm cluster management, you should run each command of the script file, step by step.
-
-**Band/Mu:**
-
-For example for Movie use-case in a without failure scenario:
-
-Movie run:
-	response/thorughput:
-```sh
-$ sbatch run.sh 4 4000000 100 {mu/band} 1 movie {0/1} 0
-```
-Movie results:
-	response time result:
-```sh
-$ grep -r -w "total average" wellcoordination/workload/4-4000000-100/movie/AE_results/{mu/band}*response* | sort -t: -n -k2 | awk '{split($0,a); if(a[8] != "-nan") {sum += a[8]; count += 1;}} END{print sum/count;}'
-```
-	throughout results:
-```sh
-$ grep -r -w "throughput" wellcoordination/workload/4-4000000-100/movie/AE_results/{mu/band}*throughput* | sort -t: -n -k2 | awk '{split($0,a); max = 100; if(a[2] < max) max = a[2];} END{print max;}'
+```bash
+cd roce
 ```
 
-For example for Courseware use-case in a failure scenario:
+Each directory is a complete project with its own source tree, build files,
+scripts, and README:
 
-Courseware failure run (response/thorughput):
-```sh
-$ sbatch run.sh 4 4000000 10 band 1 courseware {0/1} 0
-$ sbatch run.sh 4 4000000 10 band-failure 1 courseware {0/1} 1
-$ sbatch run.sh 4 4000000 10 band-failure 1 courseware {0/1} 2
-```
-Courseware failure results (response/thorughput):
-```sh
-$ grep -r -w "throughput" wellcoordination/workload/4-4000000-10/courseware/AE_results/*throughput*{no/follower/leader}* | sort -t: -n -k2 | awk '{split($0,a); max = 100; if(a[2] < max) max = a[2];} END{print max;}'
-```
+- [InfiniBand setup and experiments](infiniband/README.md)
+- [RoCE setup and validated two-node experiment](roce/README.md)
 
-**TCP based CRDTs:**
+Do not mix binaries from the two directories in one run. All replicas in an
+experiment must use binaries built from the same directory.
 
-For running the TCP-based CRDTs on a cluster we prepared a script file. You can run the script file with the following command with 3 input arguments:
-```sh
-$ sbatch run-tcp-crdt.sh arg1 arg2 arg3
-```
-arg1 is the number of operations.
-arg2 is the number of times that you want to repeat experiments.
-arg3 is the type of use-case that you want to run (counter, gset, register, orset and shop).
+## Preservation Guarantee
+
+The `infiniband/` directory is the pre-RoCE `master` source from commit
+`0de38f1`. It retains the original LID addressing, fixed InfiniBand path MTU,
+device selection, scripts, and protocol implementation.
+
+The `roce/` directory is the tested RoCE-capable source from commit `d9be264`.
+Its transport layer adds Ethernet GID/GRH addressing, active-MTU negotiation,
+explicit device selection, and Soft-RoCE queue backpressure. Hamband and Mu
+protocol decisions are unchanged.
+
+The separation is intentional: future RoCE work can remain inside `roce/`
+without changing the preserved InfiniBand implementation.

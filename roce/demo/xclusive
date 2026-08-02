@@ -1,0 +1,2 @@
+slurmstepd-i01: error: *** JOB 5410020 ON i01 CANCELLED AT 2021-10-14T11:46:58 ***
+slurmstepd-c25: error: *** JOB 5410019 ON c25 CANCELLED AT 2021-10-14T11:47:32 ***
