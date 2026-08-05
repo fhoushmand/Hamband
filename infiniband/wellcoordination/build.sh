@@ -56,3 +56,6 @@ for benchmark in "${wrdt_benchmarks[@]}"; do
   g++ -std=c++17 -O3 -pthread "../benchmark/$benchmark-benchmark.cpp" \
     -o "bin/$benchmark-benchmark"
 done
+
+g++ -std=c++17 -O3 -pthread "../benchmark/register-crdt-benchmark.cpp" \
+  -o "bin/register-crdt-benchmark"

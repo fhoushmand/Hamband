@@ -37,3 +37,7 @@ for benchmark in "${wrdt_benchmarks[@]}"; do
     "$root/wellcoordination/benchmark/$benchmark-benchmark.cpp" \
     -o "$root/wellcoordination/build/bin/$benchmark-benchmark"
 done
+
+g++ -std=c++17 -O3 -pthread \
+  "$root/wellcoordination/benchmark/register-crdt-benchmark.cpp" \
+  -o "$root/wellcoordination/build/bin/register-crdt-benchmark"
