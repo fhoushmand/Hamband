@@ -20,19 +20,36 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def local_commit() -> str:
+    command = ["git", "-C", str(REPO_ROOT), "rev-parse", "--short", "HEAD"]
     result = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "rev-parse", "--short", "HEAD"],
-        capture_output=True,
-        text=True,
-        check=True,
+        command, capture_output=True, text=True, check=False
     )
+    if result.returncode != 0:
+        worktree_git_dir = (
+            REPO_ROOT.parent / "Hamband" / ".git" / "worktrees" / REPO_ROOT.name
+        )
+        command = [
+            "git",
+            f"--git-dir={worktree_git_dir}",
+            f"--work-tree={REPO_ROOT}",
+            "rev-parse",
+            "--short",
+            "HEAD",
+        ]
+        result = subprocess.run(
+            command, capture_output=True, text=True, check=False
+        )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Cannot determine the local commit; set HAMBAND_COMMIT explicitly"
+        )
     return result.stdout.strip()
 
 
 OPERATIONS = 4_000_000
 PERCENTAGES = (15, 20, 25)
 REPLICA_COUNTS = (3, 4)
-COMMIT = os.environ.get("HAMBAND_COMMIT", local_commit())
+COMMIT = os.environ.get("HAMBAND_COMMIT") or local_commit()
 REMOTE_ROOT = "/users/jsaber/Hamband/roce"
 REGISTRY_IP = "192.168.40.30"
 DEFAULT_HOSTS = (
