@@ -258,9 +258,7 @@ if(calculate_throughput) {
   std::cout << "issued " << sent << " operations" << std::endl;
 
   protocol.rb->flush();
-  if (id == 1) {
-    protocol.flushOrdered();
-  }
+  protocol.flushOrdered();
 
   if(!calculate_throughput){
     double sum = 0;
