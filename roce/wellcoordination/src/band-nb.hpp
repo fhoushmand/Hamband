@@ -126,66 +126,20 @@ class NB_Wellcoordination : Synchronizer {
       if (collect_conflict_breakdown) {
         before_mu = std::chrono::high_resolution_clock::now();
       }
-      dory::ProposeError err =
-          tob[synch_gp]->propose(payload, payload_buffer.size());
+      dory::ProposeError err;
+      do {
+        err = tob[synch_gp]->propose(payload, payload_buffer.size());
+        if (err == dory::ProposeError::SlowPathLogRecycled) {
+          std::this_thread::sleep_for(std::chrono::seconds(1));
+        } else if (err != dory::ProposeError::NoError) {
+          std::this_thread::yield();
+        }
+      } while (err != dory::ProposeError::NoError);
       std::chrono::high_resolution_clock::time_point after_mu;
       if (collect_conflict_breakdown) {
         after_mu = std::chrono::high_resolution_clock::now();
       }
       // std::cout << "after propose" << std::endl;
-      if (err != dory::ProposeError::NoError) {
-        // request dropping, erasing it...
-        switch (err) {
-          case dory::ProposeError::FastPath:
-          case dory::ProposeError::FastPathRecyclingTriggered:
-          case dory::ProposeError::SlowPathCatchFUO:
-          case dory::ProposeError::SlowPathUpdateFollowers:
-          case dory::ProposeError::SlowPathCatchProposal:
-          case dory::ProposeError::SlowPathUpdateProposal:
-          case dory::ProposeError::SlowPathReadRemoteLogs:
-          case dory::ProposeError::SlowPathWriteAdoptedValue:
-          case dory::ProposeError::SlowPathWriteNewValue:
-            std::cout << "Error: in leader mode. Code: "
-                      << static_cast<int>(err) << std::endl;
-            break;
-
-          case dory::ProposeError::SlowPathLogRecycled:
-            std::cout << "Log recycled, waiting a bit..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            break;
-
-          case dory::ProposeError::MutexUnavailable:
-          case dory::ProposeError::FollowerMode:
-            std::cout << "Error: in follower mode. Potential leader: "
-                      << tob[synch_gp]->potentialLeader() << std::endl;
-            break;
-
-          default:
-            std::cout << "Bug in code. You should only handle errors here"
-                      << std::endl;
-        }
-        auto ret = response(request, ResponseStatus::DoryError, false);
-        if (collect_conflict_breakdown) {
-          leader_conflict_breakdown.dory_error++;
-          leader_conflict_breakdown.mu_ns +=
-              std::chrono::duration_cast<std::chrono::nanoseconds>(
-                  after_mu - before_mu)
-                  .count();
-          leader_conflict_breakdown.pre_mu_ns +=
-              std::chrono::duration_cast<std::chrono::nanoseconds>(
-                  before_mu - breakdown_start)
-                  .count();
-          leader_conflict_breakdown.post_mu_ns +=
-              std::chrono::duration_cast<std::chrono::nanoseconds>(
-                  ret.second - after_mu)
-                  .count();
-          leader_conflict_breakdown.total_ns +=
-              std::chrono::duration_cast<std::chrono::nanoseconds>(
-                  ret.second - breakdown_start)
-                  .count();
-        }
-        return ret;
-      }
       // executed with no error - sending the response.
       auto ret = response(request, ResponseStatus::NoError, debug);
       if (collect_conflict_breakdown) {
