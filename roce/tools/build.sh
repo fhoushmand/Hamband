@@ -30,7 +30,7 @@ popd >/dev/null
 
 wrdt_benchmarks=(
   account counter courseware gset movie orset pnset project register rubis shop
-  smallbank twopset
+  smallbank twopset kvstore
 )
 for benchmark in "${wrdt_benchmarks[@]}"; do
   g++ -std=c++17 -O3 -pthread \
