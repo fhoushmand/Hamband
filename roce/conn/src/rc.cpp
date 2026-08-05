@@ -283,11 +283,14 @@ bool ReliableConnection::changeRightsIfNeeded(
   return changeRights(rights);
 }
 
-bool ReliableConnection::post_send(ibv_send_wr &wr) {
+bool ReliableConnection::post_send(ibv_send_wr &wr, int *post_error) {
   // std::cout << "post send" << std::endl;
   struct ibv_send_wr *bad_wr = nullptr;
 
   auto ret = ibv_post_send(uniq_qp.get(), &wr, &bad_wr);
+  if (post_error != nullptr) {
+    *post_error = ret;
+  }
 
   if (bad_wr != nullptr) {
     LOGGER_DEBUG(logger, "Got bad wr with id: {}", bad_wr->wr_id);
@@ -297,6 +300,9 @@ bool ReliableConnection::post_send(ibv_send_wr &wr) {
   }
 
   if (ret != 0) {
+    if (post_error != nullptr) {
+      return false;
+    }
     throw std::runtime_error("Error due to driver misuse during posting: " +
                              std::string(std::strerror(errno)));
   }
@@ -345,14 +351,17 @@ bool ReliableConnection::postSendSingleCached(RdmaReq req, uint64_t req_id,
 }
 
 bool ReliableConnection::postSendSingle(RdmaReq req, uint64_t req_id, void *buf,
-                                        uint32_t len, uintptr_t remote_addr) {
+                                        uint32_t len, uintptr_t remote_addr,
+                                        int *post_error) {
   // std::cout << "first post send signal" << std::endl;
-  return postSendSingle(req, req_id, buf, len, mr.lkey, remote_addr);
+  return postSendSingle(req, req_id, buf, len, mr.lkey, remote_addr,
+                        post_error);
 }
 
 bool ReliableConnection::postSendSingle(RdmaReq req, uint64_t req_id, void *buf,
                                         uint32_t len, uint32_t lkey,
-                                        uintptr_t remote_addr) {
+                                        uintptr_t remote_addr,
+                                        int *post_error) {
   // std::cout << "post send signal" << std::endl;
   // TODO(Kristian): if not used concurrently, we could reuse the same wr
   struct ibv_send_wr wr;
@@ -369,7 +378,7 @@ bool ReliableConnection::postSendSingle(RdmaReq req, uint64_t req_id, void *buf,
       .rkey(rconn.rci.rkey)
       .build(wr, sg);
 
-  return post_send(wr);
+  return post_send(wr, post_error);
 }
 
 bool ReliableConnection::postSendSingleNoSignal(RdmaReq req, uint64_t req_id, void *buf,

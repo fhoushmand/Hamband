@@ -10,6 +10,7 @@
 #include <dory/log/context.hpp>
 
 
+#include <cerrno>
 #include <iterator>
 #include <set>
 
@@ -347,9 +348,20 @@ class LeaderPermissionAsker {
     *temp = response;
 
     auto &rc = rc_it->second;
-    rc.postSendSingle(ReliableConnection::RdmaWrite,
-                      quorum::pack(quorum::LeaderGrantWr, pid, grant_req_id),
-                      temp, sizeof(temp), rc.remoteBuf() + offset);
+    int post_error = 0;
+    bool posted;
+    do {
+      posted = rc.postSendSingle(
+          ReliableConnection::RdmaWrite,
+          quorum::pack(quorum::LeaderGrantWr, pid, grant_req_id), temp,
+          sizeof(temp), rc.remoteBuf() + offset, &post_error);
+      if (!posted && (post_error == ENOMEM || post_error == -ENOMEM)) {
+        std::this_thread::yield();
+      }
+    } while (!posted && (post_error == ENOMEM || post_error == -ENOMEM));
+    if (!posted) {
+      throw std::runtime_error("Failed to post a leader permission grant");
+    }
 
     grant_req_id += 1;
 
@@ -619,7 +631,12 @@ class LeaderSwitcher {
 
           std::cout << "Asking for permissions: " << hard_reset << std::endl;
           // Ask for permission. Wait for everybody to reply
-          permission_asker.askForPermissions(hard_reset);
+          auto permission_error =
+              permission_asker.askForPermissions(hard_reset);
+          if (!permission_error->ok()) {
+            force_permission_request = true;
+            return false;
+          }
 
           // GET_TIMESTAMP(ts_mid);
 

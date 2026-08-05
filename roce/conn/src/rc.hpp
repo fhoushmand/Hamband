@@ -145,7 +145,7 @@ class ReliableConnection {
   bool changeRightsIfNeeded(ControlBlock::MemoryRights rights);
 
   bool postSendSingle(RdmaReq req, uint64_t req_id, void *buf, uint32_t len,
-                      uintptr_t remote_addr);
+                      uintptr_t remote_addr, int *post_error = nullptr);
 
   // Only re-use this method when the previous WR posted by this method is
   // completed and a corresponding WC was consumed, otherwise unexpected
@@ -157,7 +157,8 @@ class ReliableConnection {
                             int *post_error = nullptr);
 
   bool postSendSingle(RdmaReq req, uint64_t req_id, void *buf, uint32_t len,
-                      uint32_t lkey, uintptr_t remote_addr);
+                      uint32_t lkey, uintptr_t remote_addr,
+                      int *post_error = nullptr);
 
   bool postSendSingleNoSignal(RdmaReq req, uint64_t req_id, void *buf, uint32_t len, uintptr_t remote_addr);
 
@@ -173,7 +174,7 @@ class ReliableConnection {
                 int attr_mask) const;
 
  private:
-  bool post_send(ibv_send_wr &wr);
+  bool post_send(ibv_send_wr &wr, int *post_error = nullptr);
 
   static void wr_deleter(struct ibv_send_wr *wr) { free(wr); }
 
