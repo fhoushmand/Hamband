@@ -69,7 +69,7 @@ class SmallBank : public ReplicatedObject {
     }
     std::cout << "number of accounts: " << account_number << std::endl;
     std::cout << "total balance: " << total_balance << std::endl;
-    std::cout << "state_digest: " << digest << std::endl;
+    std::cout << "state digest: " << digest << std::endl;
   }
 
   ~SmallBank() {}

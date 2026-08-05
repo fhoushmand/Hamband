@@ -98,7 +98,7 @@ public:
 
 
       std::cout << "# enrollemtns: " << enrollments.size() << std::endl;
-      std::cout << "state_digest: " << digest << std::endl;
+      std::cout << "state digest: " << digest << std::endl;
       // for(auto& e : enrollments)
       //   std::cout << "<" << e.first << "," << e.second << ">" << ", ";
       // std::cout << std::endl;

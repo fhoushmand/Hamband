@@ -306,7 +306,8 @@ bool ReliableConnection::post_send(ibv_send_wr &wr) {
 
 bool ReliableConnection::postSendSingleCached(RdmaReq req, uint64_t req_id,
                                               void *buf, uint32_t len,
-                                              uintptr_t remote_addr) {
+                                              uintptr_t remote_addr,
+                                              int *post_error) {
   wr_cached->sg_list->addr = reinterpret_cast<uintptr_t>(buf);
   wr_cached->sg_list->length = len;
 
@@ -324,6 +325,9 @@ bool ReliableConnection::postSendSingleCached(RdmaReq req, uint64_t req_id,
 
   struct ibv_send_wr *bad_wr = nullptr;
   auto ret = ibv_post_send(uniq_qp.get(), wr_cached.get(), &bad_wr);
+  if (post_error != nullptr) {
+    *post_error = ret;
+  }
 
   if (bad_wr != nullptr) {
     LOGGER_DEBUG(logger, "Got bad wr with id: {}", bad_wr->wr_id);

@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 typedef unsigned char uint8_t;
 
@@ -57,7 +58,11 @@ public:
 
     virtual void toString()
     {
-      std::cout << "balance: " << balance << std::endl;
+      int snapshot = balance.load();
+      std::cout << "balance: " << snapshot << std::endl;
+      std::cout << "state digest: "
+                << state_digest::mix(static_cast<uint64_t>(snapshot))
+                << std::endl;
     }
 
     ~BankAccount(){}

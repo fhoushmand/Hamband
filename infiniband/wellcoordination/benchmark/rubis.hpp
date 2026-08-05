@@ -118,7 +118,7 @@ public:
             digest, state_digest::mix(static_cast<uint64_t>(auction_id) + 401));
       }
       std::cout << "#users_counter: " << userscounter << std::endl;
-      std::cout << "state_digest: " << digest << std::endl;
+      std::cout << "state digest: " << digest << std::endl;
       //std::cout << "#customer_elements: " << customers.size() << std::endl;
     }
 

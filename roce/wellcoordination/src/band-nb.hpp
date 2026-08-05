@@ -12,6 +12,8 @@ using namespace band;
 
 class NB_Wellcoordination : Synchronizer {
  public:
+  static constexpr int OrderedFlushMethod = -1;
+
   struct LatencyBreakdown {
     uint64_t attempted = 0;
     uint64_t no_error = 0;
@@ -34,6 +36,7 @@ class NB_Wellcoordination : Synchronizer {
 
   void executeOrBlock(MethodCall call, bool leader);
   bool checkCallDependencies(MethodCall const& callWithDeps);
+  void flushOrdered();
 
   ~NB_Wellcoordination() { rb.reset(); }
 
@@ -62,6 +65,9 @@ class NB_Wellcoordination : Synchronizer {
                                         [[maybe_unused]] size_t len) {
         // std::cout << "commit" << std::endl;
         MethodCall request = repl_object->deserialize(buf);
+        if (request.method_type == OrderedFlushMethod) {
+          return;
+        }
         // check execution and block if dependencies are not satisfied
         executeOrBlock(request, leader);
       });
@@ -165,6 +171,24 @@ class NB_Wellcoordination : Synchronizer {
     }
   }
 };
+
+void NB_Wellcoordination::flushOrdered() {
+  MethodCall marker("__hamband_ordered_flush__", OrderedFlushMethod, "");
+  std::vector<uint8_t> payload(repl_object->serializedSize(marker));
+  auto length = repl_object->serialize(marker, payload.data());
+
+  for (size_t group = 0; group < repl_object->synch_groups.size(); group++) {
+    dory::ProposeError err;
+    do {
+      err = tob[group]->propose(payload.data(), length);
+      if (err == dory::ProposeError::SlowPathLogRecycled) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+      } else if (err != dory::ProposeError::NoError) {
+        std::this_thread::yield();
+      }
+    } while (err != dory::ProposeError::NoError);
+  }
+}
 
 void NB_Wellcoordination::executeOrBlock(MethodCall call, bool leader) {
   while (!leader && !checkCallDependencies(call)) {

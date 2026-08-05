@@ -101,7 +101,7 @@ public:
 
 
       std::cout << "# assignments: " << works.size() << std::endl;
-      std::cout << "state_digest: " << digest << std::endl;
+      std::cout << "state digest: " << digest << std::endl;
       // for(auto& e : works)
       //   std::cout << "<" << e.first << "," << e.second << ">" << ", ";
       // std::cout << std::endl;

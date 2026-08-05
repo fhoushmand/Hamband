@@ -88,11 +88,14 @@ The minimum transport changes are:
    a queue pair to RTR.
 5. `DORY_RDMA_DEVICE` selects the verbs device deterministically.
 6. Available broadcast completions are drained and checked for errors.
-7. If Soft-RoCE temporarily fills the send queue, Hamband drains outstanding
-   completions and retries the same write. This prevents a remote-log hole and
-   does not alter protocol decisions.
+7. If Soft-RoCE temporarily fills either Hamband's broadcast queue or Mu's
+   majority-write queue, the owner drains completed writes and retries the same
+   write. This prevents a remote-log hole and does not alter protocol decisions.
 8. Outstanding broadcast writes are flushed after request issuance, before
    final-state convergence is accepted.
+9. Finite WRDT runs append an ignored ordered marker after timing so Mu followers
+   can commit the final real call; Mu normally commits an entry when it observes
+   the following entry's first-undecided offset.
 
 The final two items matter on CPU Soft-RoCE because its send queue can fill
 during a million-operation burst. The original implementation ignored a failed

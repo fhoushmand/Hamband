@@ -256,6 +256,9 @@ if(calculate_throughput) {
   // std::cout << "local_throughput:"
   //           << static_cast<double>(num_ops)/static_cast<double>(local_end - local_start) << std::endl;
   std::cout << "issued " << sent << " operations" << std::endl;
+  if (id == 1) {
+    protocol.flushOrdered();
+  }
 
   if(!calculate_throughput){
     double sum = 0;

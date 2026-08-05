@@ -153,7 +153,8 @@ class ReliableConnection {
   // (which is the case when the length of the payload is smaller or equal to
   // `MaxInlining`) one can reuse this method right after it returns.
   bool postSendSingleCached(RdmaReq req, uint64_t req_id, void *buf,
-                            uint32_t len, uintptr_t remote_addr);
+                            uint32_t len, uintptr_t remote_addr,
+                            int *post_error = nullptr);
 
   bool postSendSingle(RdmaReq req, uint64_t req_id, void *buf, uint32_t len,
                       uint32_t lkey, uintptr_t remote_addr);

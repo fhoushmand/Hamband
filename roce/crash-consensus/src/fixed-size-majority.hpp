@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cerrno>
+#include <thread>
 #include <vector>
 
 //#include "branching.hpp"
@@ -166,22 +168,43 @@ class FixedSizeMajorityOperation {
 
     auto req_id = qw.fetchAndIncFastID();
     auto next_req_id = qw.nextFastReqID();
+    int expected_nr = outstanding_req * replicas_size + quorum_size;
+    auto cq = ctx->cq.get();
+    entries.resize(expected_nr);
 
     for (auto &c : connections) {
+      int post_error = 0;
       auto ok = c.rc->postSendSingleCached(
           ReliableConnection::RdmaWrite,
           QuorumWaiter::packer(kind, c.pid, req_id), from_local_memory,
           static_cast<uint32_t>(size),
-          c.rc->remoteBuf() + to_remote_memories[c.pid] + offset);
+          c.rc->remoteBuf() + to_remote_memories[c.pid] + offset, &post_error);
+
+      while (!ok && (post_error == ENOMEM || post_error == -ENOMEM)) {
+        auto num = ibv_poll_cq(cq, expected_nr, &entries[0]);
+        if (num < 0) {
+          return false;
+        }
+        if (num == 0) {
+          std::this_thread::yield();
+        } else if (!qw.fastConsume(entries, num, expected_nr)) {
+          return false;
+        }
+
+        post_error = 0;
+        ok = c.rc->postSendSingleCached(
+            ReliableConnection::RdmaWrite,
+            QuorumWaiter::packer(kind, c.pid, req_id), from_local_memory,
+            static_cast<uint32_t>(size),
+            c.rc->remoteBuf() + to_remote_memories[c.pid] + offset,
+            &post_error);
+      }
 
       if (!ok) {
         return false;
       }
     }
 
-    int expected_nr = outstanding_req * replicas_size + quorum_size;
-    auto cq = ctx->cq.get();
-    entries.resize(expected_nr);
     int num = 0;
     int loops = 0;
     constexpr unsigned mask = (1 << 14) - 1;  // Must be power of 2 minus 1

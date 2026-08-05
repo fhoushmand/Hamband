@@ -74,7 +74,7 @@ public:
       }
       std::cout << "#movie_elements: " << movies.size() << std::endl;
       std::cout << "#customer_elements: " << customers.size() << std::endl;
-      std::cout << "state_digest: " << digest << std::endl;
+      std::cout << "state digest: " << digest << std::endl;
     }
 
    
