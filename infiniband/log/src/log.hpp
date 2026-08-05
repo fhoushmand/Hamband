@@ -89,7 +89,19 @@ class ParsedCall {
     return std::make_pair(buf, length);
   }
 
-  inline bool isPopulated() { return *reinterpret_cast<uint64_t*>(ptr) > 0; }
+  inline bool isPopulated() {
+    auto length = *reinterpret_cast<volatile uint64_t*>(ptr);
+    if (length == 0) {
+      return false;
+    }
+    auto canary = reinterpret_cast<volatile uint8_t*>(
+        ptr + sizeof(uint64_t) + length);
+    if (*canary != 0xff) {
+      return false;
+    }
+    std::atomic_thread_fence(std::memory_order_acquire);
+    return true;
+  }
 
   inline size_t totalLength() {
     return *reinterpret_cast<uint64_t*>(ptr) + sizeof(uint64_t) + 1;
