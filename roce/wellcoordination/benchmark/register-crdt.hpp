@@ -1,136 +1,113 @@
+#pragma once
 
+#include <atomic>
+#include <cstdint>
 #include <iostream>
-#include <sstream>
+#include <stdexcept>
 #include <string>
-#include <vector>
-#include <cstdarg>
-#include <cstring>
-#include <unordered_set>
-#include <mutex>
 
 #include "../src/replicated_object_crdt.hpp"
+#include "state_digest.hpp"
 
+class Register : public ReplicatedObject {
+ public:
+  enum MethodType { WRITE = 0, QUERY = 1 };
 
-typedef unsigned char uint8_t;
+  Register() {
+    read_methods.push_back(static_cast<int>(MethodType::QUERY));
+    update_methods.push_back(static_cast<int>(MethodType::WRITE));
+    method_args.insert({static_cast<int>(MethodType::WRITE), 1});
+    method_args.insert({static_cast<int>(MethodType::QUERY), 0});
+  }
 
-class Register : public ReplicatedObject
-{
-private:
-    
-public:
+  Register(Register& obj) : ReplicatedObject(obj) {
+    state.store(obj.state.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+    clock.store(obj.clock.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+  }
 
-    enum MethodType{
-      WRITE = 0,
-      QUERY = 1
-    };
-
-    int local_value;
-    int local_timestamp;
-    
-    int value;
-    int timestamp;
-    
-   
-    Register() {
-      value = 0;
-
-      read_methods.push_back(static_cast<int>(MethodType::QUERY));
-
-      update_methods.push_back(static_cast<int>(MethodType::WRITE));
-
-      method_args.insert(std::make_pair(static_cast<int>(MethodType::WRITE), 1));
-      method_args.insert(std::make_pair(static_cast<int>(MethodType::QUERY), 0));
-    }
-
-    Register(Register &obj) : ReplicatedObject(obj)
-    {
-      //state
-      this->value = obj.value;
-      this->timestamp = obj.timestamp;
-
-      this->local_value = obj.value;
-      this->local_timestamp = obj.timestamp;
-    }
-   
-    // 0
-    std::string write(int val)
-    {
-      local_timestamp += 1;
-      local_value = val;
-      return std::to_string(local_timestamp);
-    }
-
-    //downStream
-    void writeDownstream(int val, int ts)
-    {
-      if (timestamp < ts){
-        timestamp = ts;
-        value = val;
-      }
-    }
-    // 1
-    Register query() { 
-      if(local_timestamp > timestamp)
-      {
-        value = local_value;
-        timestamp = local_timestamp;
-      }
-      return *this;
-    }
-
-
-    virtual std::string execute(MethodCall call)
-    {
-      switch (static_cast<MethodType>(call.method_type))
-      {
-      case MethodType::WRITE:
-      {
-        size_t index = call.arg.find_first_of('-');
-        std::string val = call.arg.substr(0, index);
-        return write(std::stoi(val));
-        break;
+  std::string execute(MethodCall call) override {
+    switch (static_cast<MethodType>(call.method_type)) {
+      case MethodType::WRITE: {
+        auto separator = call.arg.find('-');
+        std::stoi(call.arg.substr(0, separator));
+        uint32_t counter = clock.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (counter >= (1u << 24) || self < 0 || self > 255) {
+          throw std::runtime_error("Register version exhausted");
+        }
+        return std::to_string(counter) + ":" + std::to_string(self);
       }
       case MethodType::QUERY:
-        return "";
-        break;
-      default:
-        std::cout << "wrong method name" << std::endl;
-        break;
-      }
-      return "";
+        return std::to_string(valueOf(state.load(std::memory_order_relaxed)));
     }
+    throw std::runtime_error("Unknown register method");
+  }
 
-    virtual ReplicatedObject* executeDownstream(MethodCall call, bool b)
-    {
-      switch (static_cast<MethodType>(call.method_type))
-      {
-      case MethodType::WRITE:
-      {
-        size_t index = call.arg.find_first_of('-');
-        std::string val = call.arg.substr(0, index);
-        std::string ts = call.arg.substr(index + 1, call.arg.length());
-        writeDownstream(std::stoi(val), std::stoi(ts));
-        break;
-      }
-      case MethodType::QUERY:
-        return this;
-        break;
-      default:
-        std::cout << "wrong method name" << std::endl;
-        break;
-      }
+  ReplicatedObject* executeDownstream(MethodCall call, bool) override {
+    if (static_cast<MethodType>(call.method_type) != MethodType::WRITE) {
       return this;
     }
 
-    virtual void toString()
-    {
-      std::cout << "reg: " << value << std::endl;
+    auto argument_separator = call.arg.find('-');
+    auto version_separator = call.arg.find(':', argument_separator + 1);
+    if (argument_separator == std::string::npos ||
+        version_separator == std::string::npos) {
+      throw std::runtime_error("Malformed register write");
     }
 
-
-
-    virtual bool isPermissible(MethodCall call)
-    {
-        return true;
+    int value = std::stoi(call.arg.substr(0, argument_separator));
+    uint32_t counter = static_cast<uint32_t>(
+        std::stoul(call.arg.substr(argument_separator + 1,
+                                   version_separator - argument_separator - 1)));
+    uint32_t writer =
+        static_cast<uint32_t>(std::stoul(call.arg.substr(version_separator + 1)));
+    if (counter >= (1u << 24) || writer > 255) {
+      throw std::runtime_error("Invalid register version");
     }
+
+    advanceClock(counter);
+    uint32_t version = (counter << 8) | writer;
+    uint64_t desired = (static_cast<uint64_t>(version) << 32) |
+                       static_cast<uint32_t>(value);
+    uint64_t current = state.load(std::memory_order_relaxed);
+    while (versionOf(current) < version &&
+           !state.compare_exchange_weak(current, desired,
+                                        std::memory_order_relaxed,
+                                        std::memory_order_relaxed)) {
+    }
+    return this;
+  }
+
+  void toString() override {
+    uint64_t snapshot = state.load(std::memory_order_relaxed);
+    uint32_t version = versionOf(snapshot);
+    std::cout << "reg: " << valueOf(snapshot) << std::endl;
+    std::cout << "version: " << (version >> 8) << ":" << (version & 0xff)
+              << std::endl;
+    std::cout << "state digest: " << state_digest::mix(snapshot) << std::endl;
+  }
+
+  bool isPermissible(MethodCall) override { return true; }
+
+ private:
+  static uint32_t versionOf(uint64_t packed) {
+    return static_cast<uint32_t>(packed >> 32);
+  }
+
+  static int valueOf(uint64_t packed) {
+    return static_cast<int32_t>(static_cast<uint32_t>(packed));
+  }
+
+  void advanceClock(uint32_t observed) {
+    uint32_t current = clock.load(std::memory_order_relaxed);
+    while (current < observed &&
+           !clock.compare_exchange_weak(current, observed,
+                                        std::memory_order_relaxed,
+                                        std::memory_order_relaxed)) {
+    }
+  }
+
+  std::atomic<uint64_t> state{0};
+  std::atomic<uint32_t> clock{0};
 };

@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -24,7 +25,7 @@ public:
       REMOVE = 1,
       QUERY = 2
     };
-    std::atomic<bool> lock;
+    std::mutex state_mutex;
     int pnset[200001]={0};
     //int arraysize=0;
     //int arraysize=0;
@@ -57,7 +58,13 @@ public:
 
     virtual void toString()
     {
+      uint64_t digest = 0;
+      for (size_t index = 0; index < 200001; index++) {
+        state_digest::addOrdered(
+            digest, static_cast<uint64_t>(static_cast<int64_t>(pnset[index])));
+      }
       std::cout << "#elements: " << (setsize) << std::endl;
+      std::cout << "state_digest: " << digest << std::endl;
     }
 
     
@@ -66,21 +73,17 @@ public:
     {
 
       //bool find=false;
-      while(lock.load());
-      lock.store(true);
+      const std::lock_guard<std::mutex> lock(state_mutex);
       pnset[std::stoi(a)]++;
       setsize++;
-      lock.store(false);
     }
     void remove(std::string a)
     {
       //bool find=false;
-      while(lock.load());
-      lock.store(true);
+      const std::lock_guard<std::mutex> lock(state_mutex);
       //find=false;
       pnset[std::stoi(a)]--;
       setsize--;
-      lock.store(false);
     }
     // 1
     PNSet query() { return *this; }

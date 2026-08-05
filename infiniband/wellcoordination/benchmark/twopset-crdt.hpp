@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "../src/replicated_object_crdt.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -54,8 +55,16 @@ public:
 
     virtual void toString()
     {
-      std::cout << "#elementssource: " << (setsourceadd.size()-setsourceremove.size()) << std::endl;
-      std::cout << "#elementsremote: " << (setremoteadd.size()-setremoteremove.size()) << std::endl;
+      std::set<std::string> logical = setsourceadd;
+      logical.insert(setremoteadd.begin(), setremoteadd.end());
+      for (auto const& element : setsourceremove) logical.erase(element);
+      for (auto const& element : setremoteremove) logical.erase(element);
+      uint64_t digest = 0;
+      for (auto const& element : logical) {
+        state_digest::addUnordered(digest, state_digest::string(element));
+      }
+      std::cout << "#elements: " << logical.size() << std::endl;
+      std::cout << "state digest: " << digest << std::endl;
     }
 
 

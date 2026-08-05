@@ -5,6 +5,7 @@
 #include <limits>
 #include <string>
 #include <memory>
+#include <stdexcept>
 
 #include <dory/store.hpp>
 
@@ -22,12 +23,13 @@
 #include "../benchmark/kv-store.hpp"
 
 int main(int argc, char* argv[]) {
-  if (argc < 2) {
-    throw std::runtime_error("Provide the id of the process as argument");
+  if (argc != 7) {
+    throw std::runtime_error(
+        "Usage: band-crdt <id> <nodes> <operations> <write-percent> "
+        "<usecase> <failed-node:0>");
   }
   constexpr int minimum_id = 1;
-  std::string idstr(argv[1], argv[1] + 1);
-  int id = std::stoi(idstr);
+  int id = std::stoi(argv[1]);
   int nr_procs = static_cast<int>(std::atoi(argv[2]));
   int num_ops = static_cast<int>(std::atoi(argv[3]));
   double write_percentage = static_cast<double>(std::atoi(argv[4]));
@@ -38,11 +40,24 @@ int main(int argc, char* argv[]) {
   // 0 for no failure
   // 2 for leader failure
   int failed_node = std::atoi(argv[6]);
+  if (nr_procs < 2 || id < minimum_id || id >= minimum_id + nr_procs ||
+      num_ops < 0 || write_percentage < 0 || write_percentage > 100) {
+    throw std::runtime_error("Invalid process or workload arguments");
+  }
+  if (failed_node != 0) {
+    throw std::runtime_error("CRDT failure mode is disabled; use failed-node 0");
+  }
 
   std::cout << "number of operations: " << num_ops << std::endl;
   std::cout << "write precentage: "
             << static_cast<double>(write_percentage / 100) << std::endl;
-  std::string loc = WORKLOAD_LOCATION;
+  auto const* configured_workload_dir = std::getenv("HAMBAND_WORKLOAD_DIR");
+  std::string loc = configured_workload_dir == nullptr
+                        ? WORKLOAD_LOCATION
+                        : configured_workload_dir;
+  if (!loc.empty() && loc.back() != '/') {
+    loc += '/';
+  }
   loc += std::to_string(nr_procs) + "-" + std::to_string(num_ops) + "-" +
          std::to_string(static_cast<int>(write_percentage));
   loc += "/" + usecase + "/";
@@ -82,6 +97,9 @@ int main(int argc, char* argv[]) {
   }
   else if (usecase == "kvstore") {
     object = new KvStore();
+  }
+  if (object == nullptr) {
+    throw std::runtime_error("Unknown CRDT use case: " + usecase);
   }
   object->setID(id)->setNumProcess(nr_procs)->finalize();
   
@@ -129,12 +147,18 @@ int main(int argc, char* argv[]) {
   
   int sent = 0;
   std::string line;
-  int expected_calls = 0;
+  int expected_calls = -1;
   std::ifstream myfile;
   myfile.open((loc + std::to_string(id) + ".txt").c_str());
+  if (!myfile.is_open()) {
+    throw std::runtime_error("Cannot open workload file for node " +
+                             std::to_string(id));
+  }
   std::cout << "fetching the requests" << std::endl;
   std::vector<MethodCall> requests;
   while (getline(myfile, line)) {
+    if (line.empty())
+      continue;
     if (unlikely(line.at(0) == 'X')) 
       break;
     if (unlikely(line.at(0) == '#')) {
@@ -146,11 +170,14 @@ int main(int argc, char* argv[]) {
     MethodCall call = ReplicatedObject::createCall(sequence_number, line);
     requests.push_back(call);
   }
+  if (expected_calls < 0) {
+    throw std::runtime_error("Workload file is missing its write-count header");
+  }
 
   if(id != 1)
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   store.set(std::to_string(id), "ready");
-  for(int i = 1; i < nr_procs; i++)
+  for(int i = 1; i <= nr_procs; i++)
   {
     std::string value;
     while (!store.get(std::to_string(i), value));
@@ -189,8 +216,13 @@ int main(int argc, char* argv[]) {
 
   std::cout << "issued " << sent << " operations" << std::endl;
 
+  protocol.rb->flush();
+
   std::cout << "total average response time for " << sent
-              << " calls: " << static_cast<double>(local_end - local_start)  / static_cast<int>(sent) << std::endl;
+              << " calls: "
+              << (sent == 0 ? 0 : static_cast<double>(local_end - local_start) /
+                                      static_cast<double>(sent))
+              << std::endl;
 
 
   if(failed_node == 1 && id == failed_node + 1){
@@ -209,7 +241,7 @@ int main(int argc, char* argv[]) {
       }
     }
     // std::cout << "received: " << cs << std::endl;
-    if (cs == expected_calls)
+    if (cs >= expected_calls)
       break;
     std::this_thread::sleep_for(std::chrono::microseconds(10));
   }
@@ -218,8 +250,23 @@ int main(int argc, char* argv[]) {
                    std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
   std::cout << "throughput: "
-            << static_cast<double>(num_ops)/static_cast<double>(global_end - local_start) << std::endl;
+            << (global_end == local_start
+                    ? 0
+                    : static_cast<double>(num_ops) /
+                          static_cast<double>(global_end - local_start))
+            << std::endl;
+  std::cout << "final state for node " << id << ":" << std::endl;
   object->toString();
-  std::this_thread::sleep_for(std::chrono::seconds(60));
-  return 0;
+  std::cout.flush();
+
+  store.set("finished-crdt-" + std::to_string(id), "ready");
+  for (int i = 1; i <= nr_procs; i++) {
+    std::string value;
+    while (!store.get("finished-crdt-" + std::to_string(i), value)) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+  }
+  std::cout << "all nodes finished" << std::endl;
+  std::cout.flush();
+  std::_Exit(0);
 }

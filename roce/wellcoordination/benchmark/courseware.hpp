@@ -6,9 +6,11 @@
 #include <cstdarg>
 #include <cstring>
 #include <unordered_set>
+#include <unordered_map>
 #include <mutex>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -30,8 +32,8 @@ public:
     std::unordered_set<std::string> students;
     std::unordered_set<std::string> courses;
     std::unordered_set<std::pair<std::string,std::string>, pair_hash> enrollments;
-    
-    // std::recursive_mutex ss_lock;  
+    std::unordered_map<std::string, size_t> course_enrollments;
+    std::mutex student_mutex;
  
     Courseware() {
       read_methods.push_back(static_cast<int>(MethodType::QUERY));
@@ -68,10 +70,22 @@ public:
       this->students = obj.students;
       this->courses = obj.courses;
       this->enrollments = obj.enrollments;
+      this->course_enrollments = obj.course_enrollments;
     }
 
     virtual void toString()
     {
+      uint64_t digest = 0;
+      for (auto const& value : students) {
+        state_digest::addUnordered(digest, state_digest::string("s:" + value));
+      }
+      for (auto const& value : courses) {
+        state_digest::addUnordered(digest, state_digest::string("c:" + value));
+      }
+      for (auto const& value : enrollments) {
+        state_digest::addUnordered(
+            digest, state_digest::string("e:" + value.first + ":" + value.second));
+      }
       std::cout << "# students: " << students.size() << std::endl;
       // for(auto& s : students)
       //   std::cout << s << ", ";
@@ -84,6 +98,7 @@ public:
 
 
       std::cout << "# enrollemtns: " << enrollments.size() << std::endl;
+      std::cout << "state_digest: " << digest << std::endl;
       // for(auto& e : enrollments)
       //   std::cout << "<" << e.first << "," << e.second << ">" << ", ";
       // std::cout << std::endl;
@@ -107,13 +122,17 @@ public:
     void enroll(std::string s_id, std::string c_id)
     {
       // Courseware post_state = Courseware(*this);
-      enrollments.insert(std::make_pair(s_id, c_id));
+      auto inserted = enrollments.insert(std::make_pair(s_id, c_id));
+      if (inserted.second) {
+        course_enrollments[c_id]++;
+      }
       // return *this;
     }
     // 4
     void registerStudent(std::string s_id)
     {
       // Courseware post_state = Courseware(*this);
+      const std::lock_guard<std::mutex> lock(student_mutex);
       students.insert(s_id);
       // return *this;
     }
@@ -168,19 +187,16 @@ public:
       {
         if(method_type == DELETE_COURSE)
         {
-          // commented due to high impact on runtime
-          // same code for all the experiments
-          // therefore it's fair
-          // calls are made in a way that no delete course is
-          // impermissible
-          return true;
+          auto references = course_enrollments.find(call.arg);
+          return references == course_enrollments.end() ||
+                 references->second == 0;
         }
         else if(method_type == ENROLL)
         {
           size_t index = call.arg.find_first_of('-');
           std::string s = call.arg.substr(0, index);
           std::string c = call.arg.substr(index + 1, call.arg.length());
-          // const std::lock_guard<std::recursive_mutex> lock_ss(ss_lock);
+          const std::lock_guard<std::mutex> lock(student_mutex);
           if(students.find(s) == students.end() || courses.find(c) == courses.end())
             return false;
           return true;

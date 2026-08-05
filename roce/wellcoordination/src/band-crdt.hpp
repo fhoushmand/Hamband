@@ -26,7 +26,7 @@ class BandCRDT {
     num_process = remote_ids.size() + 1;
     repl_object = obj;
     payload_buffer.resize(512);
-    payload = &payload_buffer[0];
+    payload = payload_buffer.data();
     
     rb = std::make_unique<ReliableBroadcast>(id, remote_ids, repl_object);
   }
@@ -34,17 +34,23 @@ class BandCRDT {
   ReplicatedObject* request(MethodCall request, bool debug, bool summarize) {
     // a query method
     // handle localy and do not propagate
-    if(std::find(repl_object->read_methods.begin(), repl_object->read_methods.end(), request.method_type) != repl_object->read_methods.end())
+    if(std::find(repl_object->read_methods.begin(), repl_object->read_methods.end(), request.method_type) != repl_object->read_methods.end()) {
+      repl_object->internalExecuteCRDT(request, self - 1);
       return repl_object;
+    }
     
     // local at source + downstream source   
     std::string newArg = repl_object->internalExecuteCRDT(request, self - 1);
     // std::cout << "arg: " << request.arg << std::endl;
     // std::cout << "new arg: " << newArg << std::endl;
-    request.arg += "-" + newArg;
+    if (!newArg.empty()) {
+      request.arg += "-" + newArg;
+    }
     repl_object->internalDownstreamExecuteCRDT(request, self - 1, false);
-    auto length = repl_object->serializeCRDT(request, payload);
+    auto length = repl_object->serializedSizeCRDT(request);
     payload_buffer.resize(length);
+    payload = payload_buffer.data();
+    length = repl_object->serializeCRDT(request, payload);
       
     //reliable broadcast
     rb->broadcast(payload, length, summarize);

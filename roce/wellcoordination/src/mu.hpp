@@ -25,9 +25,6 @@ class Mu : Synchronizer {
     remote_ids = r_ids;
     num_process = remote_ids.size() + 1;
     repl_object = obj;
-    payload_buffer.resize(256);
-    payload = &payload_buffer[0];
-    
     tob = std::make_unique<dory::Consensus>(id, remote_ids, 8,
                                                      dory::ThreadBank::A);
 
@@ -46,8 +43,10 @@ class Mu : Synchronizer {
    virtual std::pair<ResponseStatus,std::chrono::high_resolution_clock::time_point> request(MethodCall request, bool debug, bool summarize) {
     // a query method
     // handle localy and do not propagate
-    if (std::find(repl_object->read_methods.begin(), repl_object->read_methods.end(), request.method_type) != repl_object->read_methods.end()) 
+    if (std::find(repl_object->read_methods.begin(), repl_object->read_methods.end(), request.method_type) != repl_object->read_methods.end()) {
+      repl_object->execute(request);
       return response(request, ResponseStatus::NoError, false);
+    }
 
     // no need to check (all calls are made to be permissible)
     // if (!repl_object->isPermissible(request)) {
@@ -56,6 +55,8 @@ class Mu : Synchronizer {
     // }
 
     // serialize the call
+    payload_buffer.resize(repl_object->serializedSize(request));
+    payload = payload_buffer.data();
     auto length = repl_object->serialize(request, payload);
     payload_buffer.resize(length);
     // propose the call to others

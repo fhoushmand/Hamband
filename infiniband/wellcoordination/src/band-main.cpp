@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <string>
 
 #include <dory/store.hpp>
@@ -10,26 +11,37 @@
 #include "band-nb.hpp"
 
 #include "../benchmark/account.hpp"
+#include "../benchmark/counter.hpp"
 #include "../benchmark/courseware.hpp"
+#include "../benchmark/gset.hpp"
+#include "../benchmark/orset.hpp"
+#include "../benchmark/pnset.hpp"
 #include "../benchmark/project.hpp"
+#include "../benchmark/register.hpp"
 #include "../benchmark/movie.hpp"
 #include "../benchmark/rubis.hpp"
+#include "../benchmark/shop.hpp"
 #include "../benchmark/smallbank.hpp"
+#include "../benchmark/twopset.hpp"
 
 
 int main(int argc, char* argv[]) {
-  if (argc < 2) {
-    throw std::runtime_error("Provide the id of the process as argument");
+  if (argc < 8) {
+    throw std::runtime_error(
+        "Usage: band <id> <nodes> <operations> <write-percent> <usecase> "
+        "<throughput:0|1> <failed-node:0|id>");
   }
   constexpr int minimum_id = 1;
-  std::string idstr(argv[1], argv[1] + 1);
-  int id = std::stoi(idstr);
+  int id = std::stoi(argv[1]);
   int nr_procs = static_cast<int>(std::atoi(argv[2]));
   int num_ops = static_cast<int>(std::atoi(argv[3]));
   double write_percentage = static_cast<double>(std::atoi(argv[4]));
   std::string usecase = std::string(argv[5]);
   bool calculate_throughput = (std::atoi(argv[6]) == 1);
-  double total_writes = num_ops * (write_percentage / 100);
+  if (nr_procs < 2 || id < minimum_id || id >= minimum_id + nr_procs ||
+      num_ops < 0 || write_percentage < 0 || write_percentage > 100) {
+    throw std::runtime_error("Invalid process or workload arguments");
+  }
 
   // 0 for no failure
   // 2 for leader failure
@@ -38,8 +50,13 @@ int main(int argc, char* argv[]) {
   std::cout << "number of operations: " << num_ops << std::endl;
   std::cout << "write precentage: "
             << static_cast<double>(write_percentage / 100) << std::endl;
-  std::string loc =
-      "/scratch/user/u.js213354/Hamband/wellcoordination/workload/";
+  auto const* configured_workload_dir = std::getenv("HAMBAND_WORKLOAD_DIR");
+  std::string loc = configured_workload_dir == nullptr
+                        ? "/scratch/user/u.js213354/Hamband/wellcoordination/workload/"
+                        : configured_workload_dir;
+  if (!loc.empty() && loc.back() != '/') {
+    loc += '/';
+  }
   loc += std::to_string(nr_procs) + "-" + std::to_string(num_ops) + "-" +
          std::to_string(static_cast<int>(write_percentage));
   loc += "/" + usecase + "/";
@@ -57,12 +74,26 @@ int main(int argc, char* argv[]) {
   }
   std::cout<<"seg1"<<std::endl;	
 
-  ReplicatedObject* object = NULL;
+  ReplicatedObject* object = nullptr;
   if (usecase == "account") {
-    object = new BankAccount(100000);
-  } if (usecase == "smallbank") {
+    object = new BankAccount(BankAccount::InitialBalance);
+  } else if (usecase == "smallbank") {
     object = new SmallBank(100000, 100000000);
-  }else if (usecase == "movie") {
+  } else if (usecase == "counter") {
+    object = new Counter();
+  } else if (usecase == "gset") {
+    object = new GSet();
+  } else if (usecase == "orset") {
+    object = new ORSet();
+  } else if (usecase == "pnset") {
+    object = new PNSet();
+  } else if (usecase == "register") {
+    object = new Register();
+  } else if (usecase == "shop") {
+    object = new Shop();
+  } else if (usecase == "twopset") {
+    object = new TWOPSet();
+  } else if (usecase == "movie") {
     object = new Movie();
   } else if (usecase == "rubis") {
     object = new Rubis();
@@ -81,6 +112,9 @@ int main(int argc, char* argv[]) {
       static_cast<Project*>(object)->addEmployee(std::to_string(i));
       static_cast<Project*>(object)->addProject(std::to_string(i));
     }
+  }
+  if (object == nullptr) {
+    throw std::runtime_error("Unknown WRDT use case: " + usecase);
   }
   object->setID(id)->setNumProcess(nr_procs)->finalize();
   
@@ -102,17 +136,32 @@ int main(int argc, char* argv[]) {
   int expected_calls = 0;
   std::ifstream myfile;
   myfile.open((loc + std::to_string(id) + ".txt").c_str());
+  if (!myfile.is_open()) {
+    throw std::runtime_error("Cannot open workload file: " + loc +
+                             std::to_string(id) + ".txt");
+  }
   std::cout<<"seg4"<<std::endl;
   std::vector<MethodCall> requests;
+  bool found_expected_calls = false;
   while (getline(myfile, line)) {
+    if (line.empty()) {
+      continue;
+    }
     if (unlikely(line.at(0) == '#')) {
       expected_calls = std::stoi(line.substr(1, line.size()));
+      found_expected_calls = true;
       continue;
     }
     std::string sequence_number =
         std::to_string(id) + "-" + std::to_string(call_id++);
     MethodCall call = ReplicatedObject::createCall(sequence_number, line);
+    if (call.method_type < 0 || call.method_type >= object->num_methods) {
+      throw std::runtime_error("Workload contains an invalid method type");
+    }
     requests.push_back(call);
+  }
+  if (!found_expected_calls) {
+    throw std::runtime_error("Workload is missing the expected-write header");
   }
 
   if(id != 1)
@@ -135,6 +184,9 @@ if(calculate_throughput) {
     for(MethodCall call : requests) {
       std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
           response = protocol.request(call, false, false);
+      if (response.first != ResponseStatus::NoError) {
+        throw std::runtime_error("WRDT request failed; experiment aborted");
+      }
       sent++;
     }
   }
@@ -145,6 +197,9 @@ if(calculate_throughput) {
       auto start = std::chrono::high_resolution_clock::now();
       std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
           response = protocol.request(call, false, false);
+      if (response.first != ResponseStatus::NoError) {
+        throw std::runtime_error("WRDT request failed; experiment aborted");
+      }
       sent++;
       response_times[call.method_type][call.id] =
           std::chrono::duration_cast<std::chrono::nanoseconds>(response.second -
@@ -202,32 +257,29 @@ if(calculate_throughput) {
   //           << static_cast<double>(num_ops)/static_cast<double>(local_end - local_start) << std::endl;
   std::cout << "issued " << sent << " operations" << std::endl;
 
-  if (failed_node == 0 && usecase == "account" && id == 1) {
-    protocol.collect_latency_breakdown = false;
-    MethodCall flush_call = ReplicatedObject::createCall("flush", "0 0");
-    auto flush_response = protocol.request(flush_call, false, false);
-    if (flush_response.first != ResponseStatus::NoError) {
-      std::cout << "flush request failed" << std::endl;
-    }
-  }
-
   if(!calculate_throughput){
     double sum = 0;
     double total_sum = 0;
     size_t num = 0;
     for (int i = 0; i < object->num_methods; i++) {
-      total_sum += sum;
       sum = 0;
       for (auto& pair : response_times[i]){
         sum += static_cast<double>(pair.second);
+        total_sum += static_cast<double>(pair.second);
         num++;
       }
       std::cout << "average response time for " << response_times[i].size()
                 << " calls to " << i << ": "
-                << (sum/1000) / static_cast<int>(response_times[i].size()) << std::endl;
+                << (response_times[i].empty()
+                        ? 0
+                        : (sum / 1000) /
+                              static_cast<double>(response_times[i].size()))
+                << std::endl;
     }
     std::cout << "total average response time for " << num
-              << " calls: " << (total_sum/1000) / static_cast<int>(num) << std::endl;
+              << " calls: "
+              << (num == 0 ? 0 : (total_sum / 1000) / static_cast<double>(num))
+              << std::endl;
 
     if (id == 1 && usecase == "account") {
       auto& breakdown = protocol.leader_conflict_breakdown;
@@ -294,17 +346,17 @@ if(calculate_throughput) {
     for (int i = 0; i < object->num_methods; i++)
       for (int x = 0; x < nr_procs; x++) cs += protocol.repl_object->calls_applied[i][x];
     // std::cout << "received: " << cs << std::endl;
-    if(sz == 1){
-      if (failed_node == 0) {
-        if (cs >= expected_calls)
-          break;
-      } else if (cs == ((id != 1) ? (expected_calls - 1) : expected_calls)) {
+    if (failed_node == 0) {
+      if (cs >= expected_calls) {
         break;
       }
-    }
-    else{
-      if (cs == ((id > sz) ? (expected_calls - sz) : expected_calls - 1))
+    } else if (sz == 1) {
+      if (cs >= ((id != 1) ? (expected_calls - 1) : expected_calls)) {
         break;
+      }
+    } else if (cs >= ((id > sz) ? (expected_calls - sz)
+                                 : (expected_calls - 1))) {
+      break;
     }
     std::this_thread::sleep_for(std::chrono::microseconds(100));
   }

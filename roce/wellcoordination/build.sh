@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -e
+set -e
 
 rm -rf build
 mkdir build
@@ -47,3 +47,12 @@ fi
 conan install .. --build missing 
 #--profile /rhome/fhous001/farzin/FastChain/dory/conan/profiles/gcc-debug.profile
 conan build ..
+
+wrdt_benchmarks=(
+  account counter courseware gset movie orset pnset project register rubis shop
+  smallbank twopset kvstore
+)
+for benchmark in "${wrdt_benchmarks[@]}"; do
+  g++ -std=c++17 -O3 -pthread "../benchmark/$benchmark-benchmark.cpp" \
+    -o "bin/$benchmark-benchmark"
+done

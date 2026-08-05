@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include <thread>
 
 #include <dory/crash-consensus.hpp>
@@ -31,8 +32,8 @@ class NB_Wellcoordination : Synchronizer {
   bool collect_latency_breakdown = false;
   LatencyBreakdown leader_conflict_breakdown;
 
-  void executeOrBlock(MethodCall call, bool leader, int l);
-  bool checkCallDependencies(MethodCall callWithDeps);
+  void executeOrBlock(MethodCall call, bool leader);
+  bool checkCallDependencies(MethodCall const& callWithDeps);
 
   ~NB_Wellcoordination() { rb.reset(); }
 
@@ -62,7 +63,7 @@ class NB_Wellcoordination : Synchronizer {
         // std::cout << "commit" << std::endl;
         MethodCall request = repl_object->deserialize(buf);
         // check execution and block if dependencies are not satisfied
-        executeOrBlock(request, leader, static_cast<int>(i));
+        executeOrBlock(request, leader);
       });
     }
   }
@@ -78,10 +79,11 @@ class NB_Wellcoordination : Synchronizer {
     // std::cout << "read_methods: " << repl_object->read_methods.size() << std::endl;
     if(std::find(repl_object->read_methods.begin(), repl_object->read_methods.end(), request.method_type) != repl_object->read_methods.end())
     {
+      repl_object->execute(request);
       return response(request, ResponseStatus::NoError, false);
     }
 
-    std::vector<uint8_t> payload_buffer(256);
+    std::vector<uint8_t> payload_buffer(repl_object->serializedSize(request));
     uint8_t* payload = &payload_buffer[0];
 
     // std::cout << "serialize" << request.method_type << std::endl;
@@ -210,13 +212,23 @@ class NB_Wellcoordination : Synchronizer {
   }
 };
 
-void NB_Wellcoordination::executeOrBlock(MethodCall call, bool leader, int l) {
-  while (!leader && !checkCallDependencies(call));
-  repl_object->internalExecute(call, 0); 
+void NB_Wellcoordination::executeOrBlock(MethodCall call, bool leader) {
+  while (!leader && !checkCallDependencies(call)) {
+    std::this_thread::yield();
+  }
+  size_t separator = call.id.find('-');
+  if (separator == std::string::npos) {
+    throw std::runtime_error("Method-call id does not contain an origin");
+  }
+  int origin = std::stoi(call.id.substr(0, separator)) - 1;
+  if (origin < 0 || static_cast<size_t>(origin) >= num_process) {
+    throw std::runtime_error("Method-call origin is outside the replica set");
+  }
+  repl_object->internalExecute(call, static_cast<size_t>(origin));
   return;
 }
 
-bool NB_Wellcoordination::checkCallDependencies(MethodCall callWithDeps) {
+bool NB_Wellcoordination::checkCallDependencies(MethodCall const& callWithDeps) {
   if (repl_object->dependency_relation.find(callWithDeps.method_type) == repl_object->dependency_relation.end()) return true;
   for (size_t x = 0; x < repl_object->dependency_relation[callWithDeps.method_type].size(); x++) {
     int dependency_method = repl_object->dependency_relation[callWithDeps.method_type][x];

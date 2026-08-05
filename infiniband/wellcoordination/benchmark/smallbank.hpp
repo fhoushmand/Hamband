@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 typedef unsigned char uint8_t;
 
@@ -58,7 +59,17 @@ class SmallBank : public ReplicatedObject {
   }
 
   virtual void toString() {
+    uint64_t digest = 0;
+    int64_t total_balance = 0;
+    for (size_t account = 0; account < account_number; account++) {
+      int balance = accounts[account].load();
+      total_balance += balance;
+      state_digest::addOrdered(
+          digest, static_cast<uint64_t>(static_cast<int64_t>(balance)));
+    }
     std::cout << "number of accounts: " << account_number << std::endl;
+    std::cout << "total balance: " << total_balance << std::endl;
+    std::cout << "state_digest: " << digest << std::endl;
   }
 
   ~SmallBank() {}

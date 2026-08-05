@@ -8,6 +8,7 @@
 #include <unordered_set>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -68,16 +69,11 @@ public:
       std::vector<int> g1;
       g1.push_back(static_cast<int>(MethodType::STORE_BUY_NOW));
       g1.push_back(static_cast<int>(MethodType::REGISTER_USER));
+      g1.push_back(static_cast<int>(MethodType::SELL_ITEM));
+      g1.push_back(static_cast<int>(MethodType::PLACE_BID));
+      g1.push_back(static_cast<int>(MethodType::OPEN_AUCTION));
+      g1.push_back(static_cast<int>(MethodType::CLOSE_AUCTION));
       synch_groups.push_back(g1);
-
-      //std::vector<int> g2;
-      //g2.push_back(static_cast<int>(MethodType::REGISTER_USER));
-      //synch_groups.push_back(g2);
-
-      std::vector<int> g2;
-      g2.push_back(static_cast<int>(MethodType::PLACE_BID));
-      g2.push_back(static_cast<int>(MethodType::CLOSE_AUCTION));
-      synch_groups.push_back(g2);
 
       for (int i = 0; i < 100; i++) {
         directbuysell[i] = 1000;
@@ -100,7 +96,29 @@ public:
 
     virtual void toString()
     {
+      uint64_t digest = 0;
+      for (int item = 0; item < 200; item++) {
+        state_digest::addOrdered(
+            digest, static_cast<uint64_t>(directbuysell[item].load()));
+        state_digest::addOrdered(
+            digest, static_cast<uint64_t>(auction[item][0].load()));
+        state_digest::addOrdered(
+            digest, static_cast<uint64_t>(auction[item][1].load()));
+      }
+      for (int user : registeredusers) {
+        state_digest::addUnordered(
+            digest, state_digest::mix(static_cast<uint64_t>(user) + 1));
+      }
+      for (int auction_id : openauctions) {
+        state_digest::addUnordered(
+            digest, state_digest::mix(static_cast<uint64_t>(auction_id) + 201));
+      }
+      for (int auction_id : closeauctions) {
+        state_digest::addUnordered(
+            digest, state_digest::mix(static_cast<uint64_t>(auction_id) + 401));
+      }
       std::cout << "#users_counter: " << userscounter << std::endl;
+      std::cout << "state_digest: " << digest << std::endl;
       //std::cout << "#customer_elements: " << customers.size() << std::endl;
     }
 

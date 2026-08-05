@@ -66,6 +66,7 @@ class ReliableBroadcast {
   std::unique_ptr<BandLog> log;
 
   uint64_t post_id;
+  size_t outstanding_writes = 0;
   std::vector<uint64_t> post_ids;
   std::vector<ReadingStatus> status;
   ptrdiff_t counter_offset;
@@ -81,6 +82,7 @@ class ReliableBroadcast {
   bool broadcast(uint8_t *payload, size_t len, bool override);
   int pollCQ(int number);
   bool consume();
+  void flush();
   void initPoller();
   void scanHeartbeats();
   void deliverAndExecute();
@@ -345,10 +347,24 @@ bool ReliableBroadcast::broadcast(uint8_t *payload, size_t length,
         ReliableConnection::RdmaWrite,
         quorum::pack(quorum::EntryWr, i, req_id), address,
         static_cast<uint32_t>(size), rc.remoteBuf() + offset);
-    
+    if (!ok) {
+      flush();
+      ok = rc.postSendSingle(
+          ReliableConnection::RdmaWrite,
+          quorum::pack(quorum::EntryWr, i, req_id), address,
+          static_cast<uint32_t>(size), rc.remoteBuf() + offset);
+      if (!ok) {
+        throw std::runtime_error("Failed to post CRDT broadcast RDMA write");
+      }
+    }
+    outstanding_writes++;
     i++;
   }
-  pollCQ(static_cast<int>(remote_ids.size()));
+  auto completed = pollCQ(static_cast<int>(remote_ids.size()));
+  if (static_cast<size_t>(completed) > outstanding_writes) {
+    throw std::runtime_error("Unexpected CRDT broadcast completion count");
+  }
+  outstanding_writes -= static_cast<size_t>(completed);
   // clearing the backup
   // std::cout << "clearing backup location" << std::endl;
 
@@ -372,9 +388,41 @@ bool ReliableBroadcast::consume() {
   return ret;
 }
 
+void ReliableBroadcast::flush() {
+  while (outstanding_writes > 0) {
+    auto completed = pollCQ(static_cast<int>(outstanding_writes));
+    if (static_cast<size_t>(completed) > outstanding_writes) {
+      throw std::runtime_error("Unexpected CRDT broadcast completion count");
+    }
+    outstanding_writes -= static_cast<size_t>(completed);
+    if (completed == 0) {
+      std::this_thread::yield();
+    }
+  }
+}
+
 int ReliableBroadcast::pollCQ(int number) {
-  entries.resize(number);
-  int num = ibv_poll_cq(cb->cq("band-cq").get(), number, &entries[0]);
-  return 1;
+  (void)number;
+  entries.resize(ControlBlock::CQDepth);
+
+  int completed = 0;
+  while (true) {
+    auto num = ibv_poll_cq(cb->cq("band-cq").get(),
+                           static_cast<int>(entries.size()), entries.data());
+    if (num < 0) {
+      throw std::runtime_error("Failed to poll CRDT completion queue");
+    }
+    for (int i = 0; i < num; ++i) {
+      if (entries[static_cast<size_t>(i)].status != IBV_WC_SUCCESS) {
+        throw std::runtime_error(
+            "CRDT RDMA operation failed: " +
+            std::string(ibv_wc_status_str(entries[static_cast<size_t>(i)].status)));
+      }
+    }
+    completed += num;
+    if (num < static_cast<int>(entries.size())) {
+      return completed;
+    }
+  }
 }
 }  // namespace band

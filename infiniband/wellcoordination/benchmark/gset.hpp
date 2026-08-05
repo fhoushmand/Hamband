@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -23,7 +24,7 @@ public:
       ADD = 0,
       QUERY = 1
     };
-    std::atomic<bool> lock;
+    std::mutex set_mutex;
     std::set<std::string> set;
     
     
@@ -45,17 +46,20 @@ public:
 
     virtual void toString()
     {
+      uint64_t digest = 0;
+      for (auto const& value : set) {
+        state_digest::addUnordered(digest, state_digest::string(value));
+      }
       std::cout << "#elements: " << set.size() << std::endl;
+      std::cout << "state_digest: " << digest << std::endl;
     }
 
     
     // 0
     void add(std::string a)
     {
-      while(lock.load());
-      lock.store(true);
+      const std::lock_guard<std::mutex> lock(set_mutex);
       set.insert(a);
-      lock.store(false);
     }
     // 1
     GSet query() { return *this; }

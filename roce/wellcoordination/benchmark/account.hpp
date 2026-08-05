@@ -15,6 +15,8 @@ private:
     
 public:
 
+    static constexpr int InitialBalance = 100000000;
+
     enum MethodType{
       WITHDRAW = 0,
       DEPOSIT = 1,

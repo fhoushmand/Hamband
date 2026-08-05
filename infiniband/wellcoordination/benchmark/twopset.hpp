@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -24,7 +25,8 @@ public:
       REMOVE = 1,
       QUERY = 2
     };
-    std::atomic<bool> addlock, removelock;
+    std::mutex add_mutex;
+    std::mutex remove_mutex;
     std::set<std::string> addset;
     std::set<std::string> removeset;
     
@@ -50,24 +52,29 @@ public:
 
     virtual void toString()
     {
-      std::cout << "#elements: " << (addset.size()-removeset.size()) << std::endl;
+      size_t elements = 0;
+      uint64_t digest = 0;
+      for (auto const& value : addset) {
+        if (removeset.count(value) == 0) {
+          elements++;
+          state_digest::addUnordered(digest, state_digest::string(value));
+        }
+      }
+      std::cout << "#elements: " << elements << std::endl;
+      std::cout << "state_digest: " << digest << std::endl;
     }
 
     
     // 0
     void add(std::string a)
     {
-      while(addlock.load());
-      addlock.store(true);
+      const std::lock_guard<std::mutex> lock(add_mutex);
       addset.insert(a);
-      addlock.store(false);
     }
     void remove(std::string a)
     {
-      while(removelock.load());
-      removelock.store(true);
+      const std::lock_guard<std::mutex> lock(remove_mutex);
       removeset.insert(a);
-      removelock.store(false);
     }
     // 1
     TWOPSet query() { return *this; }

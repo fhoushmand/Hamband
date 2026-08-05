@@ -63,13 +63,13 @@ add_executable(
 #    band-main-failure.cpp
 #)
 
-#add_executable(
-#    band-crdt
-#    band-main-crdt.cpp
-#)
+add_executable(
+    band-crdt
+    band-main-crdt.cpp
+)
 
 
 target_link_libraries(band ${CONAN_LIBS} pthread)
 #target_link_libraries(band-failure ${CONAN_LIBS} pthread)
-#target_link_libraries(band-crdt ${CONAN_LIBS} pthread junction turf LibCDS::cds-s)
+target_link_libraries(band-crdt ${CONAN_LIBS} pthread)
 #target_link_libraries(mu ${CONAN_LIBS} pthread)

@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -38,6 +39,11 @@ public:
       method_args.insert(std::make_pair(static_cast<int>(MethodType::ADD), 1));
       method_args.insert(std::make_pair(static_cast<int>(MethodType::REMOVE), 1));
       method_args.insert(std::make_pair(static_cast<int>(MethodType::QUERY), 0));
+
+      std::vector<int> updates;
+      updates.push_back(static_cast<int>(MethodType::ADD));
+      updates.push_back(static_cast<int>(MethodType::REMOVE));
+      synch_groups.push_back(updates);
     }
 
     ORSet(ORSet &obj) : ReplicatedObject(obj)
@@ -48,7 +54,12 @@ public:
 
     virtual void toString()
     {
+      uint64_t digest = 0;
+      for (auto const& value : set) {
+        state_digest::addUnordered(digest, state_digest::string(value));
+      }
       std::cout << "#elements: " << set.size() << std::endl;
+      std::cout << "state_digest: " << digest << std::endl;
     }
 
    

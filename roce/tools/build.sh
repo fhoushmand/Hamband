@@ -28,6 +28,12 @@ conan install .. --profile "$profile" --build=missing
 conan build ..
 popd >/dev/null
 
-g++ -std=c++17 -O3 -pthread \
-  "$root/wellcoordination/benchmark/account-benchmark.cpp" \
-  -o "$root/wellcoordination/build/bin/account-benchmark"
+wrdt_benchmarks=(
+  account counter courseware gset movie orset pnset project register rubis shop
+  smallbank twopset
+)
+for benchmark in "${wrdt_benchmarks[@]}"; do
+  g++ -std=c++17 -O3 -pthread \
+    "$root/wellcoordination/benchmark/$benchmark-benchmark.cpp" \
+    -o "$root/wellcoordination/build/bin/$benchmark-benchmark"
+done

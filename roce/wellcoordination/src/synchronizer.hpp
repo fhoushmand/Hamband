@@ -7,6 +7,7 @@
 #include <numeric>
 #include <string>
 #include <thread>
+#include <utility>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -27,7 +28,7 @@ struct MethodCall {
   uint8_t* payload;
   size_t length;
 
-  int** dependency_vectors;
+  std::vector<std::vector<int>> dependency_vectors;
 
   size_t len;
 
@@ -42,7 +43,9 @@ struct MethodCall {
     // payload = &payload_buffer[0];
   }
 
-  void setDependencies(int** dependencies) { this->dependency_vectors = dependencies; }
+  void setDependencies(std::vector<std::vector<int>> dependencies) {
+    dependency_vectors = std::move(dependencies);
+  }
 
 };
 

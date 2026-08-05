@@ -12,6 +12,7 @@
 #include <iostream>
 #include <algorithm>
 #include <atomic>
+#include <stdexcept>
 
 #include "synchronizer.hpp"
 
@@ -83,7 +84,9 @@ class ReplicatedObject {
     else
       method_type = std::stoi(call.substr(0, spaceIndex));
 
-    std::string arg = call.substr(spaceIndex + 1, call.size());
+    std::string arg = spaceIndex == std::string::npos
+                          ? std::string()
+                          : call.substr(spaceIndex + 1);
 
     MethodCall c = MethodCall(id, method_type, arg);
     return c;
@@ -108,146 +111,97 @@ class ReplicatedObject {
     }
   }
 
-  size_t serialize(MethodCall call, uint8_t* buffer) {
-    std::vector<uint8_t> idVector(call.id.begin(), call.id.end());
-    uint8_t* id_bytes = &idVector[0];
-    uint64_t id_len = idVector.size();
+  size_t serializedSize(MethodCall const& call) const {
+    auto dependencies = dependency_relation.find(call.method_type);
+    size_t num_dependencies = dependencies == dependency_relation.end()
+                                  ? 0
+                                  : dependencies->second.size();
+    return 3 * sizeof(uint64_t) + sizeof(int) + call.id.size() +
+           call.arg.size() +
+           num_process * num_dependencies * sizeof(int);
+  }
 
-    // std::cout << "id bytes: " << id_bytes << std::endl;
-    // std::cout << "id bytes size: " << id_len << std::endl;
+  size_t serialize(MethodCall const& call, uint8_t* buffer) {
+    uint64_t id_len = call.id.size();
+    uint64_t arg_len = call.arg.size();
+    size_t total_size = serializedSize(call);
+    uint64_t body_size = total_size - sizeof(uint64_t);
+    uint8_t* cursor = buffer;
 
-    // if(!call.arg.empty()){
-    std::vector<uint8_t> argVector(call.arg.begin(), call.arg.end());
-    uint8_t* arg_bytes = &argVector[0];
-    uint64_t arg_len = argVector.size();
-    // }
+    memcpy(cursor, &body_size, sizeof(body_size));
+    cursor += sizeof(body_size);
+    memcpy(cursor, &id_len, sizeof(id_len));
+    cursor += sizeof(id_len);
+    memcpy(cursor, &arg_len, sizeof(arg_len));
+    cursor += sizeof(arg_len);
+    memcpy(cursor, &call.method_type, sizeof(call.method_type));
+    cursor += sizeof(call.method_type);
 
+    memcpy(cursor, call.id.data(), id_len);
+    cursor += id_len;
+    memcpy(cursor, call.arg.data(), arg_len);
+    cursor += arg_len;
 
-    uint8_t* start = buffer + sizeof(uint64_t);
-    auto temp = start;
-
-    *reinterpret_cast<uint64_t*>(start) = id_len;
-    start += sizeof(id_len);
-
-    *reinterpret_cast<uint64_t*>(start) = arg_len;
-    start += sizeof(arg_len);
-
-    *reinterpret_cast<int*>(start) = call.method_type;
-    start += sizeof(call.method_type);
-
-    memcpy(start, id_bytes, id_len);
-    start += id_len;
-
-    if (arg_len != 0) {
-      memcpy(start, arg_bytes, arg_len);
-      start += arg_len;
-    }
-
-    size_t num_dependencies = dependency_relation[call.method_type].size();
-    if (num_dependencies != 0) {
-      // int** vector = new int*[dependency_size];
-      for (size_t i = 0; i < num_dependencies; i++) {
-        // int* vs = new int[num_process];
-        for (size_t j = 0; j < num_process; j++){
-          *reinterpret_cast<int*>(start) = calls_applied[dependency_relation[call.method_type][i]][j];
-          start += sizeof(calls_applied[dependency_relation[call.method_type][i]][j]);
+    auto dependencies = dependency_relation.find(call.method_type);
+    if (dependencies != dependency_relation.end()) {
+      for (int dependency_method : dependencies->second) {
+        for (size_t process = 0; process < num_process; process++) {
+          int applied = calls_applied[dependency_method][process].load();
+          memcpy(cursor, &applied, sizeof(applied));
+          cursor += sizeof(applied);
         }
       }
     }
-    uint64_t len = start - temp;
-
-    auto length = reinterpret_cast<uint64_t*>(start - len - sizeof(uint64_t));
-    *length = len;
-    return len + sizeof(uint64_t) + 2 * sizeof(uint64_t) +
-           sizeof(int) + num_process * num_dependencies * sizeof(int);
+    return static_cast<size_t>(cursor - buffer);
   }
 
 
   MethodCall deserialize(uint8_t* buffer) {
-    uint64_t len = *reinterpret_cast<uint64_t*>(buffer);
-    // std::cout << "-tot_size: " << len << std::endl;
+    uint64_t body_size;
+    uint64_t id_len;
+    uint64_t arg_len;
+    int method_type;
+    memcpy(&body_size, buffer, sizeof(body_size));
+    memcpy(&id_len, buffer + sizeof(uint64_t), sizeof(id_len));
+    memcpy(&arg_len, buffer + 2 * sizeof(uint64_t), sizeof(arg_len));
+    memcpy(&method_type, buffer + 3 * sizeof(uint64_t), sizeof(method_type));
 
-    uint64_t id_len = *reinterpret_cast<uint64_t*>(buffer + sizeof(uint64_t));
-    // std::cout << "-id_size: " << id_len << std::endl;
+    size_t fixed_size = 3 * sizeof(uint64_t) + sizeof(int);
+    if (body_size < fixed_size - sizeof(uint64_t) + id_len + arg_len) {
+      throw std::runtime_error("Malformed method-call payload");
+    }
 
-    uint64_t arg_len =
-        *reinterpret_cast<uint64_t*>(buffer + 2 * sizeof(uint64_t));
-    // std::cout << "-arg_size: " << arg_len << std::endl;
-
-    int method_type =
-        *reinterpret_cast<int*>(buffer + 3 * sizeof(uint64_t));
-    // std::cout << "-method: " << method_type << std::endl;
-
-    size_t id_offset = 3 * sizeof(uint64_t) + sizeof(int);
-    uint8_t* id_bytes = new uint8_t[id_len];
-    memcpy(id_bytes, buffer + id_offset, id_len);
-    std::string id(id_bytes, id_bytes + id_len);
-
-    // std::cout << "-id: " << id << std::endl;
-
+    size_t id_offset = fixed_size;
     size_t arg_offset = id_offset + id_len;
-    std::string arg = "";
-    if(arg_len != 0)
-    {
-      uint8_t* arg_bytes = new uint8_t[arg_len];
-      memcpy(arg_bytes, buffer + arg_offset, arg_len);
-      arg = std::string(arg_bytes, arg_bytes + arg_len);
-      // std::cout << "-arg: " << arg << std::endl;
-    }
-      
-    
-    size_t dependencies_offset = arg_offset + arg_len;
-    std::vector<int> dependency_methods = dependency_relation[method_type];
-    int** dependency_vectors = new int*[dependency_methods.size()];
-    for (size_t i = 0; i < dependency_methods.size(); i++)
-      dependency_vectors[i] = new int[num_process];
+    std::string id(reinterpret_cast<char*>(buffer + id_offset), id_len);
+    std::string arg(reinterpret_cast<char*>(buffer + arg_offset), arg_len);
 
-    
-    for (size_t x = 0; x < dependency_methods.size(); x++) {
-      // int method = dependency_methods[x];
-      // std::cout << "-method: " << method << std::endl;
-      for (size_t i = 0; i < num_process; i++) {
-        dependency_vectors[x][i] = *reinterpret_cast<int*>(buffer + dependencies_offset + i * sizeof(int));
-        // std::cout << dependency_vectors[x][i] << ", ";
-      }
-      dependencies_offset += num_process * sizeof(int);
+    size_t dependencies_offset = arg_offset + arg_len;
+    auto dependency_entry = dependency_relation.find(method_type);
+    size_t dependency_count = dependency_entry == dependency_relation.end()
+                                  ? 0
+                                  : dependency_entry->second.size();
+    size_t required_body = fixed_size - sizeof(uint64_t) + id_len + arg_len +
+                           dependency_count * num_process * sizeof(int);
+    if (body_size != required_body) {
+      throw std::runtime_error("Method-call payload has an invalid length");
     }
-    MethodCall output = MethodCall(id, method_type, arg);
-    output.setDependencies(dependency_vectors);
+
+    std::vector<std::vector<int>> dependency_vectors(
+        dependency_count, std::vector<int>(num_process));
+    for (size_t dependency = 0; dependency < dependency_count; dependency++) {
+      for (size_t process = 0; process < num_process; process++) {
+        memcpy(&dependency_vectors[dependency][process],
+               buffer + dependencies_offset, sizeof(int));
+        dependencies_offset += sizeof(int);
+      }
+    }
+    MethodCall output(id, method_type, arg);
+    output.setDependencies(std::move(dependency_vectors));
     return output;
   }
 
   MethodCall deserialize(char* buffer) {
-    uint64_t len = *reinterpret_cast<uint64_t*>(buffer);
-    // std::cout << "-tot_size: " << len << std::endl;
-
-    uint64_t id_len = *reinterpret_cast<uint64_t*>(buffer + sizeof(uint64_t));
-    // std::cout << "-id_size: " << id_len << std::endl;
-
-    uint64_t arg_len =
-        *reinterpret_cast<uint64_t*>(buffer + 2 * sizeof(uint64_t));
-    // std::cout << "-arg_size: " << arg_len << std::endl;
-
-    int method_type =
-        *reinterpret_cast<int*>(buffer + 3 * sizeof(uint64_t));
-    // std::cout << "-method: " << method_type << std::endl;
-
-    size_t id_offset = 3 * sizeof(uint64_t) + sizeof(int);
-    char* id_bytes = new char[id_len];
-    memcpy(id_bytes, buffer + id_offset, id_len);
-    std::string id(id_bytes, id_bytes + id_len);
-
-    // std::cout << "-id: " << id << std::endl;
-
-    size_t arg_offset = id_offset + id_len;
-    std::string arg = "";
-    if(arg_len != 0)
-    {
-      char* arg_bytes = new char[arg_len];
-      memcpy(arg_bytes, buffer + arg_offset, arg_len);
-      arg = std::string(arg_bytes, arg_bytes + arg_len);
-      // std::cout << "-arg: " << arg << std::endl;
-    }
-    return MethodCall(id, method_type, arg);
+    return deserialize(reinterpret_cast<uint8_t*>(buffer));
   }
 };

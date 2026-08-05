@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "../src/replicated_object_crdt.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -46,7 +47,9 @@ public:
 
     virtual void toString()
     {
-      std::cout << "counter: " << counter << std::endl;
+      int value = counter.load();
+      std::cout << "counter: " << value << std::endl;
+      std::cout << "state digest: " << state_digest::mix(value) << std::endl;
     }
 
    

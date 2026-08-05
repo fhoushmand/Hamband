@@ -6,9 +6,11 @@
 #include <cstdarg>
 #include <cstring>
 #include <unordered_set>
+#include <unordered_map>
 #include <mutex>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -32,6 +34,7 @@ public:
     std::unordered_set<std::string> employees;
     std::unordered_set<std::string> projects;
     std::unordered_set<std::pair<std::string,std::string>, pair_hash> works;
+    std::unordered_map<std::string, size_t> project_assignments;
     
     std::recursive_mutex ss_lock;  
  
@@ -70,10 +73,22 @@ public:
       this->employees = obj.employees;
       this->projects = obj.projects;
       this->works = obj.works;
+      this->project_assignments = obj.project_assignments;
     }
 
     virtual void toString()
     {
+      uint64_t digest = 0;
+      for (auto const& value : employees) {
+        state_digest::addUnordered(digest, state_digest::string("e:" + value));
+      }
+      for (auto const& value : projects) {
+        state_digest::addUnordered(digest, state_digest::string("p:" + value));
+      }
+      for (auto const& value : works) {
+        state_digest::addUnordered(
+            digest, state_digest::string("w:" + value.first + ":" + value.second));
+      }
       std::cout << "# employees: " << employees.size() << std::endl;
       // for(auto& s : employees)
       //   std::cout << s << ", ";
@@ -85,7 +100,8 @@ public:
       // std::cout << std::endl;
 
 
-      std::cout << "# enrollemtns: " << works.size() << std::endl;
+      std::cout << "# assignments: " << works.size() << std::endl;
+      std::cout << "state_digest: " << digest << std::endl;
       // for(auto& e : works)
       //   std::cout << "<" << e.first << "," << e.second << ">" << ", ";
       // std::cout << std::endl;
@@ -109,7 +125,10 @@ public:
     void worksOn(std::string s_id, std::string c_id)
     {
       // Project post_state = Project(*this);
-      works.insert(std::make_pair(s_id, c_id));
+      auto inserted = works.insert(std::make_pair(s_id, c_id));
+      if (inserted.second) {
+        project_assignments[c_id]++;
+      }
       // return *this;
     }
     // 4
@@ -170,12 +189,9 @@ public:
       {
         if(method_type == DELETE_PROJECT)
         {
-          // commented due to high impact on runtime
-          // same code for all the experiments
-          // therefore it's fair
-          // calls are made in a way that no delete course is
-          // impermissible
-          return true;
+          auto references = project_assignments.find(call.arg);
+          return references == project_assignments.end() ||
+                 references->second == 0;
         }
         else if(method_type == WORKS_ON)
         {

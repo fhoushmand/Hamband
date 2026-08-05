@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <numeric>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <cstring>
 #include <map>
@@ -82,7 +83,9 @@ class ReplicatedObject {
     else
       method_type = std::stoi(call.substr(0, spaceIndex));
 
-    std::string arg = call.substr(spaceIndex + 1, call.size());
+    std::string arg = spaceIndex == std::string::npos
+                          ? std::string()
+                          : call.substr(spaceIndex + 1);
 
     MethodCall c = MethodCall(id, method_type, arg);
     return c;
@@ -107,77 +110,54 @@ class ReplicatedObject {
     }
   }
 
-  static size_t serializeCRDT(MethodCall call, uint8_t* buffer) {
-    std::vector<uint8_t> idVector(call.id.begin(), call.id.end());
-    uint8_t* id_bytes = &idVector[0];
-    uint64_t id_len = idVector.size();
+  static size_t serializedSizeCRDT(MethodCall const& call) {
+    return 3 * sizeof(uint64_t) + sizeof(int) + call.id.size() +
+           call.arg.size();
+  }
 
-    std::vector<uint8_t> argVector(call.arg.begin(), call.arg.end());
-    uint8_t* arg_bytes = &argVector[0];
-    uint64_t arg_len = argVector.size();
+  static size_t serializeCRDT(MethodCall const& call, uint8_t* buffer) {
+    uint64_t id_len = call.id.size();
+    uint64_t arg_len = call.arg.size();
+    uint64_t body_size = serializedSizeCRDT(call) - sizeof(uint64_t);
+    uint8_t* cursor = buffer;
 
-    // std::cout << "arg: " <<  call.arg << std::endl;
-
-
-    uint8_t* start = buffer + sizeof(uint64_t);
-    auto temp = start;
-
-    *reinterpret_cast<uint64_t*>(start) = id_len;
-    start += sizeof(id_len);
-
-    *reinterpret_cast<uint64_t*>(start) = arg_len;
-    start += sizeof(arg_len);
-
-    *reinterpret_cast<int*>(start) = call.method_type;
-    start += sizeof(call.method_type);
-
-    memcpy(start, id_bytes, id_len);
-    start += id_len;
-
-    if (arg_len != 0) {
-      memcpy(start, arg_bytes, arg_len);
-      start += arg_len;
-    }
-
-    
-    uint64_t len = start - temp;
-
-    auto length = reinterpret_cast<uint64_t*>(start - len - sizeof(uint64_t));
-    *length = len;
-    return len + sizeof(uint64_t) + 2 * sizeof(uint64_t);
+    memcpy(cursor, &body_size, sizeof(body_size));
+    cursor += sizeof(body_size);
+    memcpy(cursor, &id_len, sizeof(id_len));
+    cursor += sizeof(id_len);
+    memcpy(cursor, &arg_len, sizeof(arg_len));
+    cursor += sizeof(arg_len);
+    memcpy(cursor, &call.method_type, sizeof(call.method_type));
+    cursor += sizeof(call.method_type);
+    memcpy(cursor, call.id.data(), id_len);
+    cursor += id_len;
+    memcpy(cursor, call.arg.data(), arg_len);
+    cursor += arg_len;
+    return static_cast<size_t>(cursor - buffer);
   }
 
   MethodCall deserializeCRDT(uint8_t* buffer) {
-    uint64_t len = *reinterpret_cast<uint64_t*>(buffer);
-    // std::cout << "-tot_size: " << len << std::endl;
-
-    uint64_t id_len = *reinterpret_cast<uint64_t*>(buffer + sizeof(uint64_t));
-    // std::cout << "-id_size: " << id_len << std::endl;
-
-    uint64_t arg_len =
-        *reinterpret_cast<uint64_t*>(buffer + 2 * sizeof(uint64_t));
-    // std::cout << "-arg_size: " << arg_len << std::endl;
-
-    int method_type =
-        *reinterpret_cast<int*>(buffer + 3 * sizeof(uint64_t));
-    // std::cout << "-method: " << method_type << std::endl;
+    uint64_t body_size;
+    uint64_t id_len;
+    uint64_t arg_len;
+    int method_type;
+    memcpy(&body_size, buffer, sizeof(body_size));
+    memcpy(&id_len, buffer + sizeof(uint64_t), sizeof(id_len));
+    memcpy(&arg_len, buffer + 2 * sizeof(uint64_t), sizeof(arg_len));
+    memcpy(&method_type, buffer + 3 * sizeof(uint64_t), sizeof(method_type));
+    uint64_t expected_body_size =
+        2 * sizeof(uint64_t) + sizeof(int) + id_len + arg_len;
+    if (body_size != expected_body_size) {
+      throw std::runtime_error("Malformed CRDT payload length");
+    }
 
     size_t id_offset = 3 * sizeof(uint64_t) + sizeof(int);
-    uint8_t* id_bytes = new uint8_t[id_len];
-    memcpy(id_bytes, buffer + id_offset, id_len);
-    std::string id(id_bytes, id_bytes + id_len);
+    std::string id(reinterpret_cast<char*>(buffer + id_offset), id_len);
 
     // std::cout << "-id: " << id << std::endl;
 
     size_t arg_offset = id_offset + id_len;
-    std::string arg = "";
-    if(arg_len != 0)
-    {
-      uint8_t* arg_bytes = new uint8_t[arg_len];
-      memcpy(arg_bytes, buffer + arg_offset, arg_len);
-      arg = std::string(arg_bytes, arg_bytes + arg_len);
-      // std::cout << "-arg: " << arg << std::endl;
-    }
+    std::string arg(reinterpret_cast<char*>(buffer + arg_offset), arg_len);
     MethodCall output = MethodCall(id, method_type, arg);
     return output;
   }
@@ -198,9 +178,13 @@ class ReplicatedObject {
       parsedArgs[i] = arg;
       return;
     }
-    int index = arg.find_first_of('-');
+    size_t index = arg.find_first_of('-');
+    if (index == std::string::npos) {
+      parsedArgs[i] = arg;
+      return;
+    }
     parsedArgs[i] = arg.substr(0, index);
-    parseArgsHelper(parsedArgs, arg.substr(index + 1, arg.length()), numArgs--, i++);
+    parseArgsHelper(parsedArgs, arg.substr(index + 1), numArgs - 1, i + 1);
   }
 
   static std::string* parseArgs(std::string arg, int numArgs){

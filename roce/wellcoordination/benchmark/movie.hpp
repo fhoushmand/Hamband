@@ -8,6 +8,7 @@
 #include <unordered_set>
 
 #include "../src/replicated_object.hpp"
+#include "state_digest.hpp"
 
 
 typedef unsigned char uint8_t;
@@ -64,8 +65,16 @@ public:
 
     virtual void toString()
     {
+      uint64_t digest = 0;
+      for (auto const& value : movies) {
+        state_digest::addUnordered(digest, state_digest::string("m:" + value));
+      }
+      for (auto const& value : customers) {
+        state_digest::addUnordered(digest, state_digest::string("c:" + value));
+      }
       std::cout << "#movie_elements: " << movies.size() << std::endl;
       std::cout << "#customer_elements: " << customers.size() << std::endl;
+      std::cout << "state_digest: " << digest << std::endl;
     }
 
    

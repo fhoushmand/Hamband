@@ -37,6 +37,10 @@ public:
 
       method_args.insert(std::make_pair(static_cast<int>(MethodType::WRITE), 1));
       method_args.insert(std::make_pair(static_cast<int>(MethodType::QUERY), 0));
+
+      std::vector<int> writes;
+      writes.push_back(static_cast<int>(MethodType::WRITE));
+      synch_groups.push_back(writes);
     }
 
     Register(Register &obj) : ReplicatedObject(obj)
