@@ -68,7 +68,7 @@ class LeaderHeartbeat {
     max_id = *(std::minmax_element(ids.begin(), ids.end()).second);
     status = std::vector<ReadingStatus>(max_id + 1);
 
-    status[ids[0]].consecutive_updates = history_length;
+    status[ids[start_id.load()]].consecutive_updates = history_length;
 
     ctx->poller.registerContext(quorum::LeaderHeartbeat);
     ctx->poller.endRegistrations(4);
