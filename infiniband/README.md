@@ -199,6 +199,60 @@ The preserved source includes the two-node quorum support added before the RoCE
 work. With two replicas, Hamband runs with one leader and one follower. This is
 independent of the RDMA transport and does not require RoCE changes.
 
+## ACES Paper Matrix
+
+`experiments/run_hamband_paper_aces.py` reproduces the Hamband workloads from
+Figures 9--11 in one fixed ACES allocation. The full matrix uses:
+
+- 3, 4, 5, 6, 7, and 8 replicas;
+- 4,000,000 total operations per configuration;
+- 0%, 15%, 20%, and 25% writes for every workload; and
+- additional 5% and 50% rows for YCSB and SmallBank.
+
+The allocation contains nine verified NUMA2 nodes: one registry and eight
+ordered worker nodes. A run with fewer than eight replicas uses a prefix of the
+same worker list, so the registry and worker-node mapping never change during
+the matrix. Failure remains disabled (`0`) in every invocation.
+
+Submit from the refreshed two-folder checkout:
+
+```bash
+cd /scratch/user/u.js213354/Hamband/infiniband
+bash experiments/submit_hamband_paper_aces.sh
+```
+
+The submission helper reads the NUMA2 inventory maintained by the nonblocking
+project, excludes every other CPU node, and asks Slurm to select nine nodes
+atomically. Slurm keeps those resources for the complete job; there is no race
+between an availability poll and reservation. To resume on an explicitly known
+set, list the same nine nodes in allocation order:
+
+```bash
+HAMBAND_FIXED_NODES=ac002,ac015,ac026,ac029,ac030,ac037,ac043,ac044,ac046 \
+  bash experiments/submit_hamband_paper_aces.sh
+```
+
+The job first runs 40K-operation account and counter smoke tests at 3, 4, and 8
+replicas. It then checkpoints each validated full-matrix row to:
+
+```text
+results/hamband_infiniband_aces_4m.csv
+```
+
+For every execution, the runner requires exact issued-operation totals, a
+finish barrier on every replica, identical final-state digests, and no crash,
+malformed call, integrity drop, Dory error, or rejected WRDT request. The CSV
+reports response time as the average of replica-local averages and throughput
+as the minimum replica throughput, in both operations per microsecond and
+operations per second. CRDT rows use one combined measurement run; WRDT rows
+use separate response-time and throughput runs.
+
+The Slurm request keeps the established four CPUs per Hamband process. It asks
+for 16 GiB per node: the largest target path has two 4 GiB Mu buffers, one 3
+GiB broadcast log, and less than 1 GiB of benchmark/application state, leaving
+several GiB of headroom. This changes only the scheduler reservation and does
+not alter protocol memory sizes or execution behavior.
+
 ## Important Separation Rule
 
 Use only binaries from this `infiniband/` directory for an original InfiniBand
