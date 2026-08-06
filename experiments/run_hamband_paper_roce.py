@@ -453,6 +453,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workload", choices=[item.usecase for item in WORKLOADS])
     parser.add_argument("--replicas", type=int, choices=REPLICA_COUNTS)
     parser.add_argument("--percentage", type=int, choices=PERCENTAGES)
+    parser.add_argument("--reuse-commit", action="append", default=[])
     parser.add_argument("--timeout", type=int, default=3600)
     return parser.parse_args()
 
@@ -463,10 +464,11 @@ def main() -> int:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     verify_cluster()
 
+    accepted_commits = {COMMIT, *args.reuse_commit}
     rows: list[dict[str, object]] = [
         dict(row)
         for row in load_rows()
-        if row.get("commit") == COMMIT and row.get("status") == "valid"
+        if row.get("commit") in accepted_commits and row.get("status") == "valid"
     ]
     completed = {row_key(row) for row in rows}
     selected_workloads = [
