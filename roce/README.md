@@ -1,8 +1,8 @@
 # Hamband over RoCE
 
 This document describes the RoCE transport variant of Hamband, how it is
-isolated from the original InfiniBand implementation, and how to reproduce the
-validated two-node bank-account experiment.
+isolated from the InfiniBand implementation, the original two-node account
+smoke test, and the completed 3--4 replica paper matrix.
 
 ## Status
 
@@ -10,14 +10,21 @@ This `roce/` project has been built and tested on these CloudLab nodes:
 
 - `jsaber@pc160.cloudlab.umass.edu`
 - `jsaber@pc161.cloudlab.umass.edu`
+- `jsaber@pc162.cloudlab.umass.edu`
+- `jsaber@pc163.cloudlab.umass.edu`
 
-The validated run used two replicas, failure handling disabled, 100% writes,
-and 1,000,000 total bank-account operations. Both replicas completed and
+The initial smoke test used two replicas, failure handling disabled, 100%
+writes, and 1,000,000 total account operations. Both replicas completed and
 converged to the independently verified balance `4752077`.
 
-This is currently a CPU Soft-RoCE validation. It proves that Hamband and Mu can
-run through the RoCE verbs path, but it is not a hardware-RoCE performance
-result.
+The completed paper matrix uses 3 and 4 replicas, 4,000,000 operations per
+configuration, and all 12 Figure 9--11 workloads. Every workload has 0%, 15%,
+20%, and 25% writes; YCSB and SmallBank additionally have 5% and 50% rows. The
+published CSV contains all 104 expected configurations.
+
+These are CPU Soft-RoCE results. They prove that Hamband and Mu can run through
+the RoCE verbs path at up to four replicas, but they are not hardware-RoCE or
+FPGA performance results.
 
 ## Protocol Preservation
 
@@ -33,8 +40,9 @@ it does not change:
 - the benchmark operation distribution.
 
 The changes are confined to RDMA addressing, queue completion handling, device
-selection, and build portability. The original InfiniBand implementation is
-preserved in the sibling `../infiniband/` directory.
+selection, build portability, and narrow completion-bookkeeping fixes that do
+not change quorum size or protocol decisions. The InfiniBand transport variant
+is maintained separately in the sibling `../infiniband/` directory.
 
 ## Keeping InfiniBand and RoCE Side by Side
 
@@ -45,9 +53,9 @@ git clone https://github.com/fhoushmand/Hamband.git
 cd Hamband/roce
 ```
 
-Use `../infiniband/` for the unchanged historical InfiniBand implementation
-and this `roce/` directory for RoCE runs. No source or CMake edits are needed
-when starting an experiment.
+Use `../infiniband/` for the InfiniBand implementation and this `roce/`
+directory for RoCE runs. Each README documents its narrow build/correctness
+fixes. No source or CMake edits are needed when selecting a transport.
 
 Do not mix binaries from `infiniband/` and `roce/` in one experiment. This
 project exchanges additional GID and MTU transport metadata, so every replica
@@ -112,9 +120,18 @@ the FPGA path:
 | --- | --- | --- | --- | --- |
 | `pc160` | `enp135s0f0` | `192.168.40.30` | `rxe0` | `1` |
 | `pc161` | `enp135s0f0` | `192.168.40.31` | `rxe0` | `1` |
+| `pc162` | `enp135s0f0` | `192.168.40.32` | `rxe0` | `1` |
+| `pc163` | `enp135s0f0` | `192.168.40.33` | `rxe0` | `1` |
 
-On both nodes, GID index `1` is the RoCE v2 IPv4-mapped GID. The active
-Soft-RoCE MTU is 1024 bytes.
+On all four nodes, GID index `1` is the RoCE v2 IPv4-mapped GID. The active
+Soft-RoCE MTU is 1024 bytes. The 3-replica runs use `pc160`--`pc162`; the
+4-replica runs use all four hosts.
+
+The matrix starts a fresh 64 MiB memcached registry on `pc160` for every
+measurement. Because only four hosts were allocated, `pc160` also runs replica
+1; there is no fifth dedicated registry host. Memcached is used for connection
+metadata, not as a protocol replica. A deployment with a spare host can isolate
+the registry without changing Hamband.
 
 ## Prerequisites
 
@@ -168,7 +185,7 @@ The GID type should be `RoCE v2`.
 
 ## Build
 
-Build on both nodes:
+Build on every participating node:
 
 ```bash
 cd "$HOME/Hamband/roce"
@@ -181,14 +198,18 @@ The build script:
 - rebuilds the local Dory/Hamband packages in dependency order;
 - extracts the repository's pinned Junction and Turf archives when the old
   gitlinks are empty;
-- builds `wellcoordination/build/bin/band`; and
-- builds `wellcoordination/build/bin/account-benchmark`.
+- builds `wellcoordination/build/bin/band` and `band-crdt`; and
+- builds all WRDT/CRDT workload generators used by Figures 9--11.
 
-Confirm the binaries:
+Confirm the protocol binaries and at least the required generators:
 
 ```bash
 test -x wellcoordination/build/bin/band
+test -x wellcoordination/build/bin/band-crdt
 test -x wellcoordination/build/bin/account-benchmark
+test -x wellcoordination/build/bin/register-crdt-benchmark
+test -x wellcoordination/build/bin/kvstore-benchmark
+test -x wellcoordination/build/bin/smallbank-benchmark
 ```
 
 ## Optional Raw RoCE Check
@@ -285,7 +306,7 @@ export HAMBAND_WORKLOAD_DIR="$ROOT/wellcoordination/workload"
 Do not reuse a registry containing keys from a previous run. Start a fresh
 memcached process for each experiment.
 
-## Validated Result
+## Validated Two-Node Result
 
 The final successful run produced:
 
@@ -293,7 +314,7 @@ The final successful run produced:
 | --- | ---: | ---: |
 | Locally issued operations | 500,000 | 500,000 |
 | Reported throughput (`ops/us`) | 0.0762054 | 0.0762037 |
-| Approximate aggregate throughput (`ops/s`) | 76,205 | 76,204 |
+| Reported throughput (`ops/s`) | 76,205 | 76,204 |
 | Final balance | 4,752,077 | 4,752,077 |
 | Finish barrier | `all nodes finished` | `all nodes finished` |
 
@@ -309,6 +330,54 @@ expected balance = 4752077
 Both logs were checked for failed work completions, exceptions, segmentation
 faults, integrity drops, and non-permissible requests. No error markers were
 present.
+
+## Validated Paper Matrix
+
+The completed CPU Soft-RoCE matrix is published at
+[`results/hamband_roce_paper_4m.csv`](results/hamband_roce_paper_4m.csv). Its
+scope is:
+
+- 3 and 4 replicas;
+- 4,000,000 total operations per configuration;
+- Counter, Register, G-Set, PN-Set, 2P-Set, Account, Courseware, Project,
+  Movie, Auction, YCSB, and SmallBank;
+- 0%, 15%, 20%, and 25% writes for every workload; and
+- additional 5% and 50% rows for YCSB and SmallBank.
+
+That produces 104 unique rows: 52 for each replica count, 8 for each Figure 9
+or Figure 10 workload, and 12 each for YCSB and SmallBank. Failure handling was
+disabled (`0`) throughout. CRDT rows use one combined measurement; WRDT rows
+use separate response and throughput executions. The CSV reports response time
+as the arithmetic mean of the replica-local response values and throughput as
+the minimum replica throughput.
+
+The SSH orchestrator used `pc160` as both registry host and replica 1, then an
+ordered prefix of `pc161`, `pc162`, and `pc163` for the remaining replicas. It
+generated deterministic workloads independently on every active host, checked
+that their hashes matched, required exactly 4,000,000 issued operations, and
+accepted a row only after every replica reached the finish barrier with the
+same state digest and no configured crash/integrity/error signature.
+
+The CSV preserves exact per-row source revisions:
+
+| Revision | Rows | Purpose |
+| --- | ---: | --- |
+| `1617b35` | 51 | Secondary Mu leader initialization stabilization |
+| `0952264` | 53 | Later descendant with pipelined quorum completion tracking |
+
+The revisions are intentionally visible in the `commit` column; this is not a
+single-revision dataset. Both retain the same protocol decisions, while the
+later revision prevents an already-completed pipelined quorum from being
+missed. All four currently deployed CloudLab checkouts are at `0952264`.
+
+The CSV was re-audited on August 6, 2026 for all 104 expected keys, exact
+operation/status/transport fields, active per-node metric columns, and every
+reported response mean and throughput minimum. The audit passed. Its SHA-256
+is:
+
+```text
+65360c8bc608c4f37892a418b6ce3fa2d5b638f73d12808746c330ee2e018dca
+```
 
 ## Hardware RoCE
 
@@ -360,12 +429,13 @@ RDMA provider that can register the requested region.
 
 ## Current Scope
 
-- Two-node CPU Soft-RoCE is validated.
-- The third node was not available for this stage.
+- Two-node account correctness and 3--4 replica paper workloads are validated
+  over CPU Soft-RoCE.
+- The published 4-replica matrix co-locates memcached and replica 1 on `pc160`;
+  it does not use a separate fifth registry host.
 - FPGA paths were intentionally excluded.
 - Hardware-RoCE performance has not yet been measured.
-- Final three-node experimental results should be gathered after the third
-  node and hardware RoCE network are ready.
+- Replica counts above four have not been measured on RoCE.
 
 These limits concern deployment and performance characterization, not the
-validated two-node protocol execution.
+validated protocol execution.

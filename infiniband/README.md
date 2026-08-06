@@ -27,21 +27,17 @@ No RoCE GID, GRH, Soft-RoCE, or queue-backpressure changes are present here.
 
 ## ACES Location
 
-The established ACES deployment is:
-
-```text
-/scratch/user/u.js213354/Hamband
-```
-
-For this two-folder repository layout, a fresh deployment can instead use:
+The validated two-folder ACES deployment is:
 
 ```text
 /scratch/user/u.js213354/Hamband/infiniband
 ```
 
-Some historical scripts contain the first path literally. Keep the established
-ACES location or update only those deployment paths when using the nested
-layout. Path changes do not require protocol changes.
+The repository root is `/scratch/user/u.js213354/Hamband`. Some historical
+scripts still contain the old pre-layout project path
+`/scratch/user/u.js213354/Hamband/` literally. Update only those deployment
+paths when using the nested layout. Path changes do not require protocol
+changes.
 
 ## Requirements
 
@@ -55,11 +51,14 @@ The original project expects:
 - the original Dory/Hamband dependencies; and
 - Slurm for the included cluster experiment scripts.
 
-On ACES, load the same modules used by the existing experiments:
+`load_modules.sh` is retained for the historical environment and references an
+old GCC module and virtual environment. For the current ACES environment, use
+the checked-in build job, which loads GCC 8 and refreshes the compiler-sensitive
+Conan packages:
 
 ```bash
 cd /scratch/user/u.js213354/Hamband/infiniband
-source load_modules.sh
+sbatch experiments/build_hamband_aces.sbatch
 ```
 
 ## Verify InfiniBand Before Building
@@ -83,7 +82,16 @@ Use the sibling `../roce/` project for Ethernet/RoCE ports.
 
 ## Build Hamband
 
-The original build entry point is under `wellcoordination/`:
+The validated ACES entry point is:
+
+```bash
+cd /scratch/user/u.js213354/Hamband/infiniband
+sbatch experiments/build_hamband_aces.sbatch
+```
+
+After preparing equivalent compiler, Conan, libibverbs, and libmemcached
+dependencies on another InfiniBand system, the original build entry point is
+under `wellcoordination/`:
 
 ```bash
 cd /scratch/user/u.js213354/Hamband/infiniband/wellcoordination
@@ -91,13 +99,14 @@ source build.sh
 ```
 
 The enabled targets are controlled by
-`wellcoordination/src/CMakeLists.txt`. Keep the same `band` and `band-main`
+`wellcoordination/src/CMakeLists.txt`. Keep the same `band` and `band-crdt`
 target selection used by the established ACES experiment.
 
-After a successful build, confirm the executable:
+After a successful build, confirm both protocol executables:
 
 ```bash
 test -x build/bin/band
+test -x build/bin/band-crdt
 ```
 
 ## Account Workload
@@ -126,21 +135,28 @@ C++17 command used by the original project.
 
 ## Run with the Existing ACES Script
 
-`runaccess.sh` is the established Slurm runner for the account experiment. It
-starts a separate memcached registry, launches one Hamband process per replica,
-waits for every worker, and stores logs under the workload directory.
+`runaccess.sh` is the historical Slurm runner for a three-replica account
+experiment. Its four-node allocation uses node 0 only for memcached and nodes
+1--3 for Hamband, waits for every worker, and stores logs under the workload
+directory.
 
-Before submitting, verify these variables in the script:
+The checked-in historical defaults still use the old pre-layout path and a 10%
+write workload:
 
 ```bash
-DORY_HOME=/scratch/user/u.js213354/Hamband/infiniband
-RESULT_LOC=/scratch/user/u.js213354/Hamband/infiniband/wellcoordination/workload
+DORY_HOME=/scratch/user/u.js213354/Hamband/
+RESULT_LOC=/scratch/user/u.js213354/Hamband/wellcoordination/workload/
 NUM_OPS=1000000
-WRITE_PERC=100
+WRITE_PERC=10
 MODE=band
 USECASE=account
 FAILURE=0
 ```
+
+Update its three absolute workload/project paths to the nested
+`/scratch/user/u.js213354/Hamband/infiniband` directory before using it with
+this layout. Use the `experiments/` runner below for the published 3--8 replica
+matrix rather than adapting `runaccess.sh`.
 
 Then submit with Slurm:
 
@@ -225,8 +241,9 @@ bash experiments/submit_hamband_paper_aces.sh
 ```
 
 Wait for the build job to complete successfully before submitting the matrix.
-The build job regenerates the InfiniBand crash-consensus Conan package before
-building `band`, `band-crdt`, and all workload generators.
+The build job regenerates the compiler-sensitive local Dory Conan packages in
+dependency order before building `band`, `band-crdt`, and all workload
+generators.
 
 The submission helper reads the NUMA2 inventory maintained by the nonblocking
 project, excludes every other CPU node, and asks Slurm to select nine nodes
@@ -235,7 +252,7 @@ between an availability poll and reservation. To resume on an explicitly known
 set, list the same nine nodes in allocation order:
 
 ```bash
-HAMBAND_FIXED_NODES=ac002,ac015,ac026,ac029,ac030,ac037,ac043,ac044,ac046 \
+HAMBAND_FIXED_NODES=ac029,ac046,ac057,ac067,ac088,ac090,ac093,ac105,ac108 \
   bash experiments/submit_hamband_paper_aces.sh
 ```
 
