@@ -20,6 +20,23 @@ module load GCC/8.3.0
 export PATH="/scratch/user/u.js213354/bin:/scratch/user/u.js213354/python-local/bin:$PATH"
 export CONAN_CPU_COUNT="${SLURM_CPUS_PER_TASK:-8}"
 
+stub_dir="/scratch/user/u.js213354/ibverbs-linkstub"
+ibverbs_so=""
+for candidate in /usr/lib64/libibverbs.so.1 /usr/lib/x86_64-linux-gnu/libibverbs.so.1; do
+  if [[ -f "$candidate" ]]; then
+    ibverbs_so="$candidate"
+    break
+  fi
+done
+if [[ -z "$ibverbs_so" ]]; then
+  echo "ERROR: libibverbs.so.1 is unavailable" >&2
+  exit 1
+fi
+mkdir -p "$stub_dir"
+ln -sf "$ibverbs_so" "$stub_dir/libibverbs.so"
+export LIBRARY_PATH="$stub_dir:${LIBRARY_PATH:-}"
+export CMAKE_LIBRARY_PATH="$stub_dir:${CMAKE_LIBRARY_PATH:-}"
+
 conan export conan/exports/compiler-options dory/stable
 while read -r directory package; do
   conan create "$directory" \
