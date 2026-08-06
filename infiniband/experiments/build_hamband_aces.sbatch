@@ -18,11 +18,25 @@ cd "$ROOT"
 module purge
 module load GCC/8.3.0
 export PATH="/scratch/user/u.js213354/bin:/scratch/user/u.js213354/python-local/bin:$PATH"
+export CONAN_CPU_COUNT="${SLURM_CPUS_PER_TASK:-8}"
 
-conan create crash-consensus \
-  --profile default \
-  --build=outdated \
-  --test-folder=None
+conan export conan/exports/compiler-options dory/stable
+while read -r directory package; do
+  conan create "$directory" \
+    --profile default \
+    --build="$package" \
+    --test-folder=None
+done <<'PACKAGES'
+extern dory-external
+shared dory-shared
+memstore dory-memstore
+ctrl dory-ctrl
+conn dory-connection
+mem dory-memory
+log dory-log
+crash-consensus dory-crash-consensus
+PACKAGES
+
 cd wellcoordination
 bash build.sh
 
