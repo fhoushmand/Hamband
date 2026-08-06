@@ -187,8 +187,11 @@ class FixedSizeMajorityOperation {
         }
         if (num == 0) {
           std::this_thread::yield();
-        } else if (!qw.fastConsume(entries, num, expected_nr)) {
-          return false;
+        } else {
+          int responses_left = 0;
+          if (!qw.fastConsume(entries, num, responses_left)) {
+            return false;
+          }
         }
 
         post_error = 0;
