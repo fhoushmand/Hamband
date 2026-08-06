@@ -16,7 +16,7 @@ exec > >(tee "$ROOT/results/hamband_ib_build.${SLURM_JOB_ID}.log") 2>&1
 
 cd "$ROOT"
 module purge
-module load gcc/9.2.1
+module load GCC/9.3.0
 export PATH="/scratch/user/u.js213354/bin:/scratch/user/u.js213354/python-local/bin:$PATH"
 
 ./build.py crash-consensus
