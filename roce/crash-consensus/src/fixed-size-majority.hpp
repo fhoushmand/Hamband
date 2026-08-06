@@ -168,7 +168,7 @@ class FixedSizeMajorityOperation {
 
     auto req_id = qw.fetchAndIncFastID();
     auto next_req_id = qw.nextFastReqID();
-    int expected_nr = outstanding_req * replicas_size + quorum_size;
+    int expected_nr = (outstanding_req + 1) * replicas_size;
     auto cq = ctx->cq.get();
     entries.resize(expected_nr);
 
