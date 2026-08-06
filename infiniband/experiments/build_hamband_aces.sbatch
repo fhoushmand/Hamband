@@ -16,25 +16,16 @@ exec > >(tee "$ROOT/results/hamband_ib_build.${SLURM_JOB_ID}.log") 2>&1
 
 cd "$ROOT"
 module purge
-module load GCC/9.3.0
+module load GCC/8.3.0
 export PATH="/scratch/user/u.js213354/bin:/scratch/user/u.js213354/python-local/bin:$PATH"
 
-conan remote disable conancenter
-trap 'conan remote enable conancenter' EXIT
-conan_install_dir="${TMPDIR:-/tmp}/hamband-spdlog-$SLURM_JOB_ID"
-mkdir -p "$conan_install_dir"
-conan install spdlog/1.5.0@ \
-  --profile "$ROOT/conan/profiles/gcc-release.profile" \
-  --install-folder "$conan_install_dir" \
-  --build=missing
-
-./build.py crash-consensus
+conan create crash-consensus \
+  --profile default \
+  --build=outdated \
+  --test-folder=None
 cd wellcoordination
 bash build.sh
 
 test -x build/bin/band
 test -x build/bin/band-crdt
 sha256sum build/bin/band build/bin/band-crdt
-
-conan remote enable conancenter
-trap - EXIT
