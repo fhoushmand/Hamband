@@ -125,15 +125,16 @@ bool SerialQuorumWaiter<ID>::fastConsume(std::vector<struct ibv_wc>& entries,
       auto current_seq = scoreboard[pid];
       scoreboard[pid] = current_seq + modulo == seq ? seq : 0;
 
-      if (scoreboard[pid] == next_id) {
-        left -= 1;
-        ret_left = left;
-      }
-
-      if (left == 0) {
-        left = quorum_size;
+      while (static_cast<int>(std::count_if(
+                 scoreboard.begin(), scoreboard.end(),
+                 [this](ID seq) { return seq >= next_id; })) >= quorum_size) {
         next_id += modulo;
       }
+
+      left = quorum_size - static_cast<int>(std::count_if(
+                               scoreboard.begin(), scoreboard.end(),
+                               [this](ID seq) { return seq >= next_id; }));
+      ret_left = left;
     }
   }
 
