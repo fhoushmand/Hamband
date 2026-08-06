@@ -3,9 +3,11 @@
 This directory contains the preserved original Hamband implementation for
 InfiniBand clusters such as ACES.
 
-It is a complete project snapshot from pre-RoCE commit `0de38f1`. The files in
-this directory are not converted to RoCE and retain the behavior used by the
-existing InfiniBand experiments.
+It began as a complete project snapshot from pre-RoCE commit `0de38f1`. The
+files in this directory are not converted to RoCE and retain the transport and
+protocol behavior used by the existing InfiniBand experiments. Narrow fixes
+needed for safe replica scaling and the current ACES build environment are
+documented below.
 
 ## What Is Preserved
 
@@ -257,6 +259,68 @@ for 16 GiB per node: the largest target path has two 4 GiB Mu buffers, one 3
 GiB broadcast log, and less than 1 GiB of benchmark/application state, leaving
 several GiB of headroom. This changes only the scheduler reservation and does
 not alter protocol memory sizes or execution behavior.
+
+### Completed ACES Run
+
+The full matrix completed successfully on August 5--6, 2026. Its provenance is:
+
+| Property | Value |
+| --- | --- |
+| Git commit used by every process | `293fd3d581527e0a95adf7ae535ffd82284f654d` |
+| Slurm job | `2024524` (`COMPLETED`, exit `0:0`) |
+| Elapsed time | `03:42:07` |
+| Registry node | `ac029` |
+| Ordered worker nodes | `ac046, ac057, ac067, ac088, ac090, ac093, ac105, ac108` |
+| Valid full-matrix rows | `312` |
+| Failed/retried configurations | `0` |
+| CSV SHA-256 | `b18cbeef9f188c45c6488755269cd7b5e07f879260c74c224f43a0c8e6f8a897` |
+
+The final CSV is [`results/hamband_infiniband_aces_4m.csv`](results/hamband_infiniband_aces_4m.csv).
+It contains 24 rows for each Figure 9 and Figure 10 workload, plus 36
+rows each for YCSB and SmallBank, for 312 rows total. All rows use 4,000,000
+operations and the same fixed nine-node allocation. The 40K-operation smoke
+phase also passed Account and Counter at 3, 4, and 8 replicas before the full
+matrix began.
+
+`experiments/audit_hamband_paper_aces.py` independently validates the final
+CSV and retained raw logs. For this run it checked all 312 matrix keys, 468
+protocol executions, and 2,574 node logs. It recomputes each response-time
+mean and throughput minimum from the per-node values and verifies exact issued
+operation totals, converged state digests, fixed node prefixes, matching WRDT
+response/throughput states, and the absence of crash, integrity-drop, Dory,
+malformed-request, and rejected-call signatures.
+
+The audit command used on ACES was:
+
+```bash
+module purge
+module load GCCcore/10.2.0 Python/3.8.6
+python3 experiments/audit_hamband_paper_aces.py \
+  --csv results/hamband_infiniband_aces_4m.csv \
+  --log-dir results/hamband_infiniband_aces_4m_logs \
+  --job-log results/hamband_infiniband_aces_4m.2024524.log \
+  --expected-commit 293fd3d581527e0a95adf7ae535ffd82284f654d \
+  --expected-job-id 2024524 \
+  --expected-nodes 'ac029;ac046;ac057;ac067;ac088;ac090;ac093;ac105;ac108'
+```
+
+The audit result was `PASS` with exactly 312 CSV rows, 468 run directories,
+and 2,574 node logs.
+
+### Minimal ACES Fixes
+
+The only protocol-path change needed for the 3--8 replica matrix is in
+`crash-consensus/src/quorum-waiter.cpp`. The waiter now consumes consecutive
+already-completed pipelined quorum rounds from its existing scoreboard instead
+of advancing only when the newest completion exactly equals the next sequence
+number. Quorum sizes, self-vote handling, message ordering, failure policy, and
+the fast path are unchanged. This prevents a completed quorum from being
+missed when completions arrive ahead of the consumer at four or more replicas.
+
+The ACES GCC 8 build also links standalone workload generators with
+`libstdc++fs`, conditionally and only for compilers older than GCC 9. This is a
+build compatibility fix for `std::filesystem`; it does not affect Hamband or
+Mu execution.
 
 ## Important Separation Rule
 
