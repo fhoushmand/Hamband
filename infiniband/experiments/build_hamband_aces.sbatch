@@ -34,8 +34,11 @@ if [[ -z "$ibverbs_so" ]]; then
 fi
 mkdir -p "$stub_dir"
 ln -sf "$ibverbs_so" "$stub_dir/libibverbs.so"
-export LIBRARY_PATH="$stub_dir:${LIBRARY_PATH:-}"
-export CMAKE_LIBRARY_PATH="$stub_dir:${CMAKE_LIBRARY_PATH:-}"
+memcached_lib_dir="/scratch/user/u.js213354/libmemcached/build/lib"
+test -f "$memcached_lib_dir/libmemcached.so.11.0.0"
+export LIBRARY_PATH="$stub_dir:$memcached_lib_dir:${LIBRARY_PATH:-}"
+export CMAKE_LIBRARY_PATH="$stub_dir:$memcached_lib_dir:${CMAKE_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="$memcached_lib_dir:${LD_LIBRARY_PATH:-}"
 
 conan export conan/exports/compiler-options dory/stable
 while read -r directory package; do

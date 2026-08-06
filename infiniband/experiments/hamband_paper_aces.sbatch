@@ -11,6 +11,7 @@ mkdir -p "$RESULTS"
 
 module purge
 module load GCCcore/10.2.0 Python/3.8.6
+export LD_LIBRARY_PATH="/scratch/user/u.js213354/libmemcached/build/lib:${LD_LIBRARY_PATH:-}"
 
 test -x wellcoordination/build/bin/band
 test -x wellcoordination/build/bin/band-crdt
