@@ -52,10 +52,18 @@ wrdt_benchmarks=(
   account counter courseware gset movie orset pnset project register rubis shop
   smallbank twopset kvstore
 )
+
+filesystem_lib=()
+compiler_major=$(g++ -dumpfullversion -dumpversion)
+compiler_major=${compiler_major%%.*}
+if (( compiler_major < 9 )); then
+  filesystem_lib=(-lstdc++fs)
+fi
+
 for benchmark in "${wrdt_benchmarks[@]}"; do
   g++ -std=c++17 -O3 -pthread "../benchmark/$benchmark-benchmark.cpp" \
-    -o "bin/$benchmark-benchmark"
+    -o "bin/$benchmark-benchmark" "${filesystem_lib[@]}"
 done
 
 g++ -std=c++17 -O3 -pthread "../benchmark/register-crdt-benchmark.cpp" \
-  -o "bin/register-crdt-benchmark"
+  -o "bin/register-crdt-benchmark" "${filesystem_lib[@]}"
