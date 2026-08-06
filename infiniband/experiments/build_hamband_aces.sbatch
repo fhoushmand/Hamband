@@ -21,9 +21,11 @@ export PATH="/scratch/user/u.js213354/bin:/scratch/user/u.js213354/python-local/
 
 conan remote disable conancenter
 trap 'conan remote enable conancenter' EXIT
+conan_install_dir="${TMPDIR:-/tmp}/hamband-spdlog-$SLURM_JOB_ID"
+mkdir -p "$conan_install_dir"
 conan install spdlog/1.5.0@ \
   --profile "$ROOT/conan/profiles/gcc-release.profile" \
-  --install-folder "$SLURM_TMPDIR/spdlog-conan" \
+  --install-folder "$conan_install_dir" \
   --build=missing
 
 ./build.py crash-consensus
