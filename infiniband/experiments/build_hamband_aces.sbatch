@@ -19,6 +19,13 @@ module purge
 module load GCC/9.3.0
 export PATH="/scratch/user/u.js213354/bin:/scratch/user/u.js213354/python-local/bin:$PATH"
 
+conan remote disable conancenter
+trap 'conan remote enable conancenter' EXIT
+conan install spdlog/1.5.0@ \
+  --profile "$ROOT/conan/profiles/gcc-release.profile" \
+  --install-folder "$SLURM_TMPDIR/spdlog-conan" \
+  --build=missing
+
 ./build.py crash-consensus
 cd wellcoordination
 bash build.sh
@@ -26,3 +33,6 @@ bash build.sh
 test -x build/bin/band
 test -x build/bin/band-crdt
 sha256sum build/bin/band build/bin/band-crdt
+
+conan remote enable conancenter
+trap - EXIT
