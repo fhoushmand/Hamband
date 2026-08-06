@@ -218,8 +218,13 @@ Submit from the refreshed two-folder checkout:
 
 ```bash
 cd /scratch/user/u.js213354/Hamband/infiniband
+sbatch experiments/build_hamband_aces.sbatch
 bash experiments/submit_hamband_paper_aces.sh
 ```
+
+Wait for the build job to complete successfully before submitting the matrix.
+The build job regenerates the InfiniBand crash-consensus Conan package before
+building `band`, `band-crdt`, and all workload generators.
 
 The submission helper reads the NUMA2 inventory maintained by the nonblocking
 project, excludes every other CPU node, and asks Slurm to select nine nodes
