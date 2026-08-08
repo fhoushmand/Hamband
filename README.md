@@ -7,7 +7,7 @@ experiment.
 | Directory | Transport | Purpose |
 | --- | --- | --- |
 | [`infiniband/`](infiniband/) | InfiniBand | ACES implementation and validated 3--8 replica matrix |
-| [`roce/`](roce/) | InfiniBand or RoCE | CPU Soft-RoCE implementation and validated 3--4 replica matrix |
+| [`roce/`](roce/) | InfiniBand or RoCE | Validated 3--4 replica Soft-RoCE and hardware-RoCE matrices |
 
 ## Choosing a Version
 
@@ -40,9 +40,9 @@ original transport behavior, with documented narrow replica-scaling and ACES
 build fixes.
 
 The `roce/` directory adds Ethernet GID/GRH addressing, active-MTU negotiation,
-explicit device selection, and Soft-RoCE queue backpressure. Its README records
-the exact revisions used by the published result rows. Hamband and Mu protocol
-decisions are unchanged.
+explicit device selection, and RoCE queue backpressure. Its README records the
+exact revisions and topology used by the Soft-RoCE and hardware-RoCE result
+rows. Hamband and Mu protocol decisions are unchanged.
 
 The separation is intentional: future RoCE work can remain inside `roce/`
 without changing the preserved InfiniBand implementation.
@@ -50,4 +50,5 @@ without changing the preserved InfiniBand implementation.
 Published results are kept with their transport:
 
 - [`infiniband/results/hamband_infiniband_aces_4m.csv`](infiniband/results/hamband_infiniband_aces_4m.csv)
-- [`roce/results/hamband_roce_paper_4m.csv`](roce/results/hamband_roce_paper_4m.csv)
+- [`roce/results/hamband_soft_roce_paper_4m.csv`](roce/results/hamband_soft_roce_paper_4m.csv)
+- [`roce/results/hamband_hardware_roce_paper_4m.csv`](roce/results/hamband_hardware_roce_paper_4m.csv)

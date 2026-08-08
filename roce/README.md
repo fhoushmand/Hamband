@@ -2,7 +2,8 @@
 
 This document describes the RoCE transport variant of Hamband, how it is
 isolated from the InfiniBand implementation, the original two-node account
-smoke test, and the completed 3--4 replica paper matrix.
+smoke test, and the completed 3--4 replica Soft-RoCE and hardware-RoCE paper
+matrices.
 
 ## Status
 
@@ -17,14 +18,15 @@ The initial smoke test used two replicas, failure handling disabled, 100%
 writes, and 1,000,000 total account operations. Both replicas completed and
 converged to the independently verified balance `4752077`.
 
-The completed paper matrix uses 3 and 4 replicas, 4,000,000 operations per
-configuration, and all 12 Figure 9--11 workloads. Every workload has 0%, 15%,
-20%, and 25% writes; YCSB and SmallBank additionally have 5% and 50% rows. The
-published CSV contains all 104 expected configurations.
+The paper matrix was completed separately over CPU Soft-RoCE and the Mellanox
+hardware RoCE fabric. Each matrix uses 3 and 4 replicas, 4,000,000 operations
+per configuration, and all 12 Figure 9--11 workloads. Every workload has 0%,
+15%, 20%, and 25% writes; YCSB and SmallBank additionally have 5% and 50% rows.
+Each published CSV contains all 104 expected configurations.
 
-These are CPU Soft-RoCE results. They prove that Hamband and Mu can run through
-the RoCE verbs path at up to four replicas, but they are not hardware-RoCE or
-FPGA performance results.
+The hardware matrix uses `mlx5_0` and RoCE-v2 GID index `3` on all four hosts.
+It is a real hardware-RoCE measurement, not RXE/Soft-RoCE. FPGA paths remain
+outside the scope of both datasets.
 
 ## Protocol Preservation
 
@@ -72,9 +74,13 @@ selected port's link layer and chooses the addressing mode automatically:
 Transport selection is controlled through environment variables:
 
 ```bash
-# RoCE example
+# Soft-RoCE example
 export DORY_RDMA_DEVICE=rxe0
 export DORY_GID_INDEX=1
+
+# Hardware-RoCE example on the validated OCT hosts
+export DORY_RDMA_DEVICE=mlx5_0
+export DORY_GID_INDEX=3
 
 # InfiniBand example with the dual-capable project
 export DORY_RDMA_DEVICE=mlx5_0
@@ -110,11 +116,10 @@ during a million-operation burst. The original implementation ignored a failed
 `ibv_post_send`, which could leave one replica waiting forever for a log entry.
 Backpressure activates only when the provider rejects a post.
 
-## Validated CloudLab Topology
+## Validated Soft-RoCE Topology
 
-The Mellanox ports on the two allocated machines were link-up but were not in a
-shared L2 network. The direct CPU Ethernet network was therefore used, without
-the FPGA path:
+The Soft-RoCE deployment used the direct CPU Ethernet network, without the
+FPGA path. It was first validated on two hosts and later expanded to all four:
 
 | Host | Ethernet interface | IPv4 address | Soft-RoCE device | GID index |
 | --- | --- | --- | --- | --- |
@@ -133,10 +138,33 @@ measurement. Because only four hosts were allocated, `pc160` also runs replica
 metadata, not as a protocol replica. A deployment with a spare host can isolate
 the registry without changing Hamband.
 
+## Validated Hardware-RoCE Topology
+
+The hardware rerun used the active 100 Gb/s Mellanox port on every host:
+
+| Host | Hardware interface | RoCE IPv4 | Verbs device | GID index | Active MTU |
+| --- | --- | --- | --- | ---: | ---: |
+| `pc160` | `enp216s0np0` | `192.168.2.101` | `mlx5_0` | `3` | `4096` |
+| `pc161` | `enp216s0np0` | `192.168.2.103` | `mlx5_0` | `3` | `4096` |
+| `pc162` | `enp216s0np0` | `192.168.2.111` | `mlx5_0` | `3` | `4096` |
+| `pc163` | `enp216s0np0` | `192.168.2.120` | `mlx5_0` | `3` | `4096` |
+
+`mlx5_0/1` reported `ACTIVE`, driver `mlx5_core`, Ethernet link layer, and
+`RoCE v2` at GID index `3` on all four nodes. Direct 64 KiB RDMA writes from
+`pc160` to each peer reached approximately 97.97 Gb/s.
+
+The 3-replica rows use `pc160`--`pc162`; 4-replica rows use all four hosts.
+A fresh 64 MiB memcached registry is co-located with replica 1 on `pc160` for
+every execution. The registry uses management address `198.22.255.171:9999`,
+while every protocol process explicitly selects `mlx5_0` and GID index `3` for
+the RDMA data path. This avoids ambiguous duplicate routes on the secondary
+Ethernet interfaces of `pc161` and `pc162` without changing measured protocol
+execution.
+
 ## Prerequisites
 
 The tested hosts use Ubuntu 22.04, GCC 11, and Conan 1. Install the required
-packages on both nodes:
+packages on every participating node:
 
 ```bash
 sudo apt-get update
@@ -212,7 +240,7 @@ test -x wellcoordination/build/bin/kvstore-benchmark
 test -x wellcoordination/build/bin/smallbank-benchmark
 ```
 
-## Optional Raw RoCE Check
+## Optional Raw Soft-RoCE Check
 
 Before running Hamband, a raw RC write test can verify the RoCE path. On
 `pc160`:
@@ -254,7 +282,7 @@ wellcoordination/workload/2-1000000-100/account/2.txt
 Each replica receives 500,000 local operations. Node 1 receives conflicting
 withdrawals and node 2 receives non-conflicting deposits.
 
-## Run the Two-Node Experiment
+## Run the Two-Node Soft-RoCE Experiment
 
 The `band` command-line format used here is:
 
@@ -306,7 +334,7 @@ export HAMBAND_WORKLOAD_DIR="$ROOT/wellcoordination/workload"
 Do not reuse a registry containing keys from a previous run. Start a fresh
 memcached process for each experiment.
 
-## Validated Two-Node Result
+## Validated Two-Node Soft-RoCE Result
 
 The final successful run produced:
 
@@ -331,10 +359,10 @@ Both logs were checked for failed work completions, exceptions, segmentation
 faults, integrity drops, and non-permissible requests. No error markers were
 present.
 
-## Validated Paper Matrix
+## Validated Soft-RoCE Matrix
 
 The completed CPU Soft-RoCE matrix is published at
-[`results/hamband_roce_paper_4m.csv`](results/hamband_roce_paper_4m.csv). Its
+[`results/hamband_soft_roce_paper_4m.csv`](results/hamband_soft_roce_paper_4m.csv). Its
 scope is:
 
 - 3 and 4 replicas;
@@ -368,7 +396,8 @@ The CSV preserves exact per-row source revisions:
 The revisions are intentionally visible in the `commit` column; this is not a
 single-revision dataset. Both retain the same protocol decisions, while the
 later revision prevents an already-completed pipelined quorum from being
-missed. All four currently deployed CloudLab checkouts are at `0952264`.
+missed. These revisions are historical provenance for the Soft-RoCE rows; the
+later hardware rerun used commit `736bbd6` on all four nodes.
 
 The CSV was re-audited on August 6, 2026 for all 104 expected keys, exact
 operation/status/transport fields, active per-node metric columns, and every
@@ -379,20 +408,75 @@ is:
 65360c8bc608c4f37892a418b6ce3fa2d5b638f73d12808746c330ee2e018dca
 ```
 
-## Hardware RoCE
+## Validated Hardware-RoCE Matrix
 
-For a hardware RoCE NIC, do not create `rxe0`. Configure the Ethernet/RoCE
-network normally, identify the verbs device and routable RoCE v2 GID index,
-then select them:
+The complete hardware result is published at
+[`results/hamband_hardware_roce_paper_4m.csv`](results/hamband_hardware_roce_paper_4m.csv).
+It has exactly the same 104 matrix keys as the Soft-RoCE CSV: 3 and 4 replicas,
+all 12 Figure 9--11 workloads, 4,000,000 operations, 0%/15%/20%/25% writes,
+and the additional 5%/50% YCSB and SmallBank rows. Failure handling is disabled
+(`0`) throughout.
+
+The hardware CSV reports the arithmetic mean of replica-local response times
+and the minimum replica throughput. CRDT rows use one combined execution;
+WRDT rows use separate response and throughput executions whose final state
+digests must match.
+
+| Property | Value |
+| --- | --- |
+| Completion date | August 8, 2026 |
+| Git commit used by every process | `736bbd6` |
+| RDMA transport | Hardware RoCE v2, `mlx5_0`, GID index `3` |
+| Fixed hosts | `pc160, pc161, pc162, pc163` |
+| Registry | `pc160`, `198.22.255.171:9999`, co-located with replica 1 |
+| Valid CSV rows | `104` |
+| Measurement executions | `156` |
+| Replica logs audited | `546` |
+| Failed/retried configurations | `0` |
+| Approximate total matrix time | `01:37:36` |
+| CSV SHA-256 | `54ed0b0cfb9d771f258620a4757dfb1b7de2470c0e8dfdd3ebe5bbb1bdfe4c0b` |
+
+Run the resumable hardware matrix from a controller checkout with passwordless
+SSH access to all four hosts:
 
 ```bash
-export DORY_RDMA_DEVICE=mlx5_0
-export DORY_GID_INDEX=<roce-v2-gid-index>
+cd roce
+HAMBAND_COMMIT=736bbd6 \
+  python3 experiments/run_hamband_paper_hardware_roce.py --timeout 3600
 ```
 
-The connection code will use GID/GRH addressing because the selected port's
-link layer is Ethernet. Rebuild only when compiler or dependency settings
-differ; changing the selected device or GID does not require source changes.
+The runner verifies `mlx5_core`, active `mlx5_0/1`, Ethernet link layer, and
+RoCE-v2 GID index `3` on every host before starting. It independently generates
+and hash-checks each workload on every active replica, starts a fresh registry
+for every execution, and writes a row only after exact operation totals,
+finish barriers, convergence, matching WRDT split-run states, and error checks
+all pass.
+
+The explicit `HAMBAND_COMMIT` is required when resuming the published dataset
+from a later controller checkout: the measured protocol binaries remain at
+`736bbd6`, while the runner, result, and documentation are committed afterward.
+
+The independent audit command is:
+
+```bash
+python3 experiments/audit_hamband_paper_hardware_roce.py \
+  --csv results/hamband_hardware_roce_paper_4m.csv \
+  --soft-roce-csv results/hamband_soft_roce_paper_4m.csv \
+  --log-dir results/hamband_hardware_roce_paper_4m_logs \
+  --expected-commit 736bbd6
+```
+
+The audit result was `PASS` for all 104 rows, 156 executions, and 546 node
+logs. It recomputed every response mean and throughput minimum, verified exact
+key parity with the Soft-RoCE matrix, found a hardware `mlx5_0` marker and no
+`rxe0` marker in every node log, and rechecked convergence and all configured
+error signatures. Raw logs are retained locally under the ignored
+`results/hamband_hardware_roce_paper_4m_logs/` directory.
+
+For another hardware RoCE NIC, do not create `rxe0`. Select the hardware verbs
+device and routable RoCE-v2 GID index. The connection code uses GID/GRH
+addressing because the port link layer is Ethernet. Changing the selected
+device or GID does not require source changes.
 
 ## Troubleshooting
 
@@ -404,12 +488,14 @@ Run `ibv_devices` and set `DORY_RDMA_DEVICE` to an existing verbs device.
 
 Check the GID table under
 `/sys/class/infiniband/<device>/ports/1/gids/` and select a populated index.
-For this CloudLab setup, the correct value is `1`.
+For the validated CloudLab setups, Soft-RoCE uses `rxe0` index `1` and hardware
+RoCE uses `mlx5_0` index `3`.
 
 ### Nodes wait during connection exchange
 
-Confirm that both nodes use the same fresh memcached registry and can reach
-`192.168.40.30:9999`. Also confirm that both selected GIDs are on the same
+Confirm that all nodes use the same fresh memcached registry. The Soft-RoCE
+matrix uses `192.168.40.30:9999`; the hardware matrix uses management address
+`198.22.255.171:9999`. Also confirm that every selected GID belongs to the same
 RoCE network.
 
 ### `rxe0` disappears
@@ -429,12 +515,12 @@ RDMA provider that can register the requested region.
 
 ## Current Scope
 
-- Two-node account correctness and 3--4 replica paper workloads are validated
-  over CPU Soft-RoCE.
-- The published 4-replica matrix co-locates memcached and replica 1 on `pc160`;
-  it does not use a separate fifth registry host.
+- Two-node account correctness is validated over CPU Soft-RoCE.
+- The complete 104-row, 3--4 replica paper matrix is validated independently
+  over both CPU Soft-RoCE and hardware RoCE v2.
+- Both published 4-replica matrices co-locate memcached and replica 1 on
+  `pc160`; neither uses a separate fifth registry host.
 - FPGA paths were intentionally excluded.
-- Hardware-RoCE performance has not yet been measured.
 - Replica counts above four have not been measured on RoCE.
 
 These limits concern deployment and performance characterization, not the

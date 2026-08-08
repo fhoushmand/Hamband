@@ -45,6 +45,8 @@ build/
 .deps/
 
 wellcoordination/workload/**
+experiments/__pycache__/
+results/*_logs/
 
 .ssh/*
 *~
