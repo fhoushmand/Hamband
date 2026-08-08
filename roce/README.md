@@ -113,7 +113,7 @@ Backpressure activates only when the provider rejects a post.
 ## Validated CloudLab Topology
 
 The Mellanox ports on the two allocated machines were link-up but were not in a
-shared L2 network. The direct CPU 40 GbE network was therefore used, without
+shared L2 network. The direct CPU Ethernet network was therefore used, without
 the FPGA path:
 
 | Host | Ethernet interface | IPv4 address | Soft-RoCE device | GID index |
