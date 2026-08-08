@@ -401,11 +401,11 @@ later hardware rerun used commit `736bbd6` on all four nodes.
 
 The CSV was re-audited on August 6, 2026 for all 104 expected keys, exact
 operation/status/transport fields, active per-node metric columns, and every
-reported response mean and throughput minimum. The audit passed. Its SHA-256
-is:
+reported response mean and throughput minimum. The audit passed. Its canonical
+LF-encoded repository SHA-256 is:
 
 ```text
-65360c8bc608c4f37892a418b6ce3fa2d5b638f73d12808746c330ee2e018dca
+c55b84fbb06a58dfc64202f694831fd85f8a445a86b0dd242e351aa2611380d9
 ```
 
 ## Validated Hardware-RoCE Matrix
@@ -434,7 +434,7 @@ digests must match.
 | Replica logs audited | `546` |
 | Failed/retried configurations | `0` |
 | Approximate total matrix time | `01:37:36` |
-| CSV SHA-256 | `54ed0b0cfb9d771f258620a4757dfb1b7de2470c0e8dfdd3ebe5bbb1bdfe4c0b` |
+| Canonical LF CSV SHA-256 | `08b013533081a9f93b637615821a6c7f917e7918a7e32b789e1cd6e44c1ab6a9` |
 
 Run the resumable hardware matrix from a controller checkout with passwordless
 SSH access to all four hosts:
