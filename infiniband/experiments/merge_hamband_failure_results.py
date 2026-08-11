@@ -100,7 +100,7 @@ def validate(
         require(row["failed_node"] == failed_node, f"{key}: wrong failed node")
         require(row["surviving_replicas"] == "3", f"{key}: wrong survivor count")
         require(
-            row["failure_injection"] == "fail-stop-after-half-local-operations",
+            row["failure_injection"] == "heartbeat-stop-after-half-local-operations",
             f"{key}: wrong failure injection",
         )
         require(row["issued_operations_total"] == "4000000", f"{key}: lost calls")

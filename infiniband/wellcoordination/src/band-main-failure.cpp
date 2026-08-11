@@ -1,4 +1,3 @@
-#include <csignal>
 #include <cstdlib>
 #include <chrono>
 #include <cstdint>
@@ -189,8 +188,9 @@ int main(int argc, char* argv[]) {
         std::cout << "issued before failure " << own_issued << " operations"
                   << std::endl;
         std::cout.flush();
-        std::raise(SIGSTOP);
-        std::_Exit(0);
+        while (true) {
+          std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
       }
       waitForFailure(store);
       failure_observed = true;

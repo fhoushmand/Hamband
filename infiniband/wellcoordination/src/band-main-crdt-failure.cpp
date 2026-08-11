@@ -1,4 +1,3 @@
-#include <csignal>
 #include <cstdlib>
 #include <chrono>
 #include <cstdint>
@@ -161,14 +160,16 @@ int main(int argc, char* argv[]) {
   for (size_t index = 0; index < own_calls.size(); index++) {
     if (!failure_observed && index == failure_index) {
       if (id == failed_node) {
+        protocol.rb->hb_active.store(false);
         store.set(FailureKey, std::to_string(failed_node));
         std::cout << "failure injected at node " << id << " after "
                   << own_issued << " local operations" << std::endl;
         std::cout << "issued before failure " << own_issued << " operations"
                   << std::endl;
         std::cout.flush();
-        std::raise(SIGSTOP);
-        std::_Exit(0);
+        while (true) {
+          std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
       }
       waitForFailure(store);
       protocol.rb->failed_nodes.insert(failed_node);

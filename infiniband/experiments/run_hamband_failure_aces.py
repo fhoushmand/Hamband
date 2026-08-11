@@ -678,7 +678,7 @@ def make_row(
             "write_percentage": percentage,
             "failure_scenario": scenario.failure_scenario,
             "failed_node": scenario.failed_node,
-            "failure_injection": "fail-stop-after-half-local-operations",
+            "failure_injection": "heartbeat-stop-after-half-local-operations",
             "surviving_replicas": REPLICAS - 1,
             "response_time_avg_us": f"{statistics.fmean(response_values):.9f}",
             "throughput_min_ops_per_us": f"{minimum_throughput:.9f}",
