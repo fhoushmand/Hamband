@@ -216,6 +216,9 @@ int main(int argc, char* argv[]) {
       while (!protocol.tob[0]->amILeader()) {
         std::this_thread::sleep_for(std::chrono::microseconds(100));
       }
+      // Mu advances two handoff log positions before follower delivery resumes.
+      protocol.flushOrdered();
+      protocol.flushOrdered();
       std::cout << "new leader elected: node " << id << std::endl;
     }
     for (auto const& call : redirected_calls) {
