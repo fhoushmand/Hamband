@@ -225,6 +225,9 @@ int main(int argc, char* argv[]) {
     for (auto const& call : redirected_calls) {
       issue(call, redirected_issued);
     }
+    if (failed_node == 1) {
+      protocol.flushOrdered();
+    }
   }
 
   std::cout << "issued " << own_issued << " own operations" << std::endl;
