@@ -65,15 +65,21 @@ add_executable(
     band-main.cpp
 )
 
-#add_executable(
-#    band-failure
-#    band-main-failure.cpp
-#)
+add_executable(
+    band-failure
+    band-main-failure.cpp
+)
 
 add_executable(
     band-crdt
     band-main-crdt.cpp
 )
+
+add_executable(
+    band-crdt-failure
+    band-main-crdt-failure.cpp
+)
+target_compile_definitions(band-crdt-failure PRIVATE HAMBAND_ENABLE_CRDT_FAILURE=1)
 
 
 set(LibCDS_DIR "/rhome/fhous001/farzin/vcpkg/packages/libcds_x64-linux/share/libcds")
@@ -88,6 +94,7 @@ endif()
 # -------------------------------------------------------------------------------
 
 target_link_libraries(band ${CONAN_LIBS} pthread)
-#target_link_libraries(band-failure ${CONAN_LIBS} pthread)
+target_link_libraries(band-failure ${CONAN_LIBS} pthread)
 target_link_libraries(band-crdt ${CONAN_LIBS} pthread)
+target_link_libraries(band-crdt-failure ${CONAN_LIBS} pthread)
 #target_link_libraries(mu ${CONAN_LIBS} pthread)

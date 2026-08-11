@@ -1,303 +1,270 @@
-#include <stdlib.h>
-#include <cstdio>
+#include <csignal>
+#include <cstdlib>
+#include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <limits>
+#include <stdexcept>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include <dory/store.hpp>
 
 #include "band-nb.hpp"
 
-#include "../config.h"
-
 #include "../benchmark/account.hpp"
-#include "../benchmark/courseware.hpp"
-#include "../benchmark/project.hpp"
-#include "../benchmark/movie.hpp"
+
+namespace {
+constexpr char FailureKey[] = "hamband-failure-triggered";
+
+struct WorkloadFile {
+  int expected_writes = -1;
+  std::vector<std::string> calls;
+};
+
+std::string workloadDirectory(int replicas, int operations, int percentage,
+                              std::string const& usecase) {
+  auto const* configured = std::getenv("HAMBAND_WORKLOAD_DIR");
+  std::string root = configured == nullptr
+                         ? "/scratch/user/u.js213354/Hamband/infiniband/"
+                           "wellcoordination/workload"
+                         : configured;
+  if (!root.empty() && root.back() != '/') {
+    root += '/';
+  }
+  return root + std::to_string(replicas) + "-" +
+         std::to_string(operations) + "-" + std::to_string(percentage) +
+         "/" + usecase + "/";
+}
+
+WorkloadFile readWorkload(std::string const& path) {
+  std::ifstream input(path);
+  if (!input.is_open()) {
+    throw std::runtime_error("Cannot open workload file: " + path);
+  }
+
+  WorkloadFile workload;
+  std::string line;
+  while (std::getline(input, line)) {
+    if (line.empty()) {
+      continue;
+    }
+    if (line.front() == '#') {
+      if (workload.expected_writes != -1) {
+        throw std::runtime_error("Duplicate workload header: " + path);
+      }
+      workload.expected_writes = std::stoi(line.substr(1));
+      continue;
+    }
+    workload.calls.push_back(line);
+  }
+  if (workload.expected_writes < 0) {
+    throw std::runtime_error("Missing workload header: " + path);
+  }
+  return workload;
+}
+
+std::vector<MethodCall> makeCalls(std::vector<std::string> const& raw,
+                                  size_t first, int origin,
+                                  int& sequence_number) {
+  std::vector<MethodCall> calls;
+  calls.reserve(raw.size() - first);
+  for (size_t index = first; index < raw.size(); index++) {
+    calls.push_back(ReplicatedObject::createCall(
+        std::to_string(origin) + "-" + std::to_string(sequence_number++),
+        raw[index]));
+  }
+  return calls;
+}
+
+void waitForFailure(dory::MemoryStore& store) {
+  std::string value;
+  while (!store.get(FailureKey, value)) {
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
+  }
+}
+}  // namespace
 
 int main(int argc, char* argv[]) {
-  if (argc < 2) {
-    throw std::runtime_error("Provide the id of the process as argument");
+  if (argc != 8) {
+    throw std::runtime_error(
+        "Usage: band-failure <id> <nodes> <operations> <write-percent> "
+        "<usecase> <throughput:0|1> <failed-node:1|2>");
   }
-  constexpr int minimum_id = 1;
-  std::string idstr(argv[1], argv[1] + 1);
-  int id = std::stoi(idstr);
-  int nr_procs = static_cast<int>(std::atoi(argv[2]));
-  int num_ops = static_cast<int>(std::atoi(argv[3]));
-  double write_percentage = static_cast<double>(std::atoi(argv[4]));
-  std::string usecase = std::string(argv[5]);
-  bool calculate_throughput = (std::atoi(argv[6]) == 1);
-  double total_writes = num_ops * (write_percentage / 100);
 
-  // 0 for no failure
-  // 2 for leader failure
-  int failed_node = std::atoi(argv[7]);
+  int const id = std::stoi(argv[1]);
+  int const replicas = std::stoi(argv[2]);
+  int const operations = std::stoi(argv[3]);
+  int const percentage = std::stoi(argv[4]);
+  std::string const usecase = argv[5];
+  bool const calculate_throughput = std::stoi(argv[6]) == 1;
+  int const failed_node = std::stoi(argv[7]);
+  if (replicas != 4 || id < 1 || id > replicas || operations <= 0 ||
+      percentage < 0 || percentage > 100 || usecase != "account" ||
+      (failed_node != 1 && failed_node != 2)) {
+    throw std::runtime_error("Invalid Account failure experiment arguments");
+  }
 
-  std::cout << "number of operations: " << num_ops << std::endl;
-  std::cout << "write precentage: "
-            << static_cast<double>(write_percentage / 100) << std::endl;
-  std::string loc = WORKLOAD_LOCATION;
-  loc += std::to_string(nr_procs) + "-" + std::to_string(num_ops) + "-" +
-         std::to_string(static_cast<int>(write_percentage));
-  loc += "/" + usecase + "/";
-
-  // Build the list of remote ids
   std::vector<int> remote_ids;
-  for (int i = 0, min_id = minimum_id; i < nr_procs; i++, min_id++) {
-    if (min_id == id) {
-      continue;
-    } else {
-      remote_ids.push_back(min_id);
+  for (int node = 1; node <= replicas; node++) {
+    if (node != id) {
+      remote_ids.push_back(node);
     }
   }
 
-
-  ReplicatedObject* object = NULL;
-  if (usecase == "account") {
-    object = new BankAccount(100000);
-  } else if (usecase == "movie") {
-    object = new Movie();
-  } else if (usecase == "courseware") {
-    object = new Courseware();
-    // init object
-    for (int i = 0; i < 1000; i++) {
-      static_cast<Courseware*>(object)->registerStudent(std::to_string(i));
-      static_cast<Courseware*>(object)->addCourse(std::to_string(i));
-    }
-  }
-  else if (usecase == "project") {
-    object = new Project();
-    // init object
-    for (int i = 0; i < 1000; i++) {
-      static_cast<Project*>(object)->addEmployee(std::to_string(i));
-      static_cast<Project*>(object)->addProject(std::to_string(i));
-    }
-  }
-  object->setID(id)->setNumProcess(nr_procs)->finalize();
-  
-  std::unordered_map<std::string, uint64_t>* response_times =
-      new std::unordered_map<std::string, uint64_t>[object->num_methods];
-  for (int i = 0; i < object->num_methods; i++)
-    response_times[i] = std::unordered_map<std::string, uint64_t>();
-
-
-  std::atomic<bool> own_requests_done = false;
-  auto& store = dory::MemoryStore::getInstance();
-  NB_Wellcoordination protocol(id, remote_ids, object);
-  std::this_thread::sleep_for(std::chrono::seconds(10));
-  // crucial to start the failure detector
+  BankAccount account(BankAccount::InitialBalance);
+  account.setID(id)->setNumProcess(replicas)->finalize();
+  NB_Wellcoordination protocol(id, remote_ids, &account);
   protocol.rb->hb_active.store(true);
+  std::this_thread::sleep_for(std::chrono::seconds(10));
 
-
-  int call_id = 0;
-  std::ifstream leader_requests;
-  std::ifstream follower_requests;
-  std::string l;
-  int new_sent = 0;
-  std::thread leaderChange;
-  // only do this when a leader crashes
-  // redirects the rest of the requests to the new leader (node 2)
-  if (failed_node == 1) {
-    leader_requests.open((loc + "leader" + ".txt").c_str());
-    leaderChange = std::thread([&] {
-      while (true) {
-        if (own_requests_done.load() &&
-        protocol.tob[0]->amILeader()) {
-          std::cout << "started sending remaining leader messages" << std::endl; 
-          while (getline(leader_requests, l)) {
-            std::string sequence_number =
-            std::to_string(id) + "-" + std::to_string(call_id++);
-            MethodCall call = ReplicatedObject::createCall(sequence_number, l);
-            if (protocol.request(call, false, false).first == ResponseStatus::NoError) new_sent++;
-          }
-          std::cout << "finished sending" << std::endl;
-          break;
-        }
-      }
-      return;
-    });
-  }
-  
-  std::thread followerChange;
-  // redirect the rest of the requests to the next node
-  if (failed_node == 2 && id == failed_node + 1) {
-    follower_requests.open((loc + "follower" + ".txt").c_str());
-    followerChange = std::thread([&] {
-      while (true) {
-        if (own_requests_done.load()) {
-          std::cout << "started sending remaining follower messages" << std::endl;
-          while (getline(follower_requests, l)) {
-            std::string sequence_number =
-            std::to_string(id) + "-" + std::to_string(call_id++);
-            MethodCall call = ReplicatedObject::createCall(sequence_number, l);
-            if (protocol.request(call, false, false).first == ResponseStatus::NoError) new_sent++;
-          }
-          std::cout << "finished sending" << std::endl;
-          break;
-        }
-      }
-      return;
-    });
+  std::string const directory =
+      workloadDirectory(replicas, operations, percentage, usecase);
+  WorkloadFile const own =
+      readWorkload(directory + std::to_string(id) + ".txt");
+  if (own.expected_writes != operations * percentage / 100) {
+    throw std::runtime_error("Workload header does not match requested writes");
   }
 
-  int sent = 0;
-  std::string line;
-  int expected_calls = 0;
-  std::ifstream myfile;
-  if(id == failed_node)
-    myfile.open((loc + std::to_string(id) + "-failure" + ".txt").c_str());
-  else
-    myfile.open((loc + std::to_string(id) + ".txt").c_str());
+  int call_sequence = 0;
+  std::vector<MethodCall> own_calls = makeCalls(own.calls, 0, id, call_sequence);
+  size_t const failure_index = own_calls.size() / 2;
+  int const redirector = failed_node == 1 ? 2 : failed_node + 1;
+  std::vector<MethodCall> redirected_calls;
+  if (id == redirector) {
+    WorkloadFile const failed =
+        readWorkload(directory + std::to_string(failed_node) + ".txt");
+    if (failed.expected_writes != own.expected_writes) {
+      throw std::runtime_error("Failed-node workload header differs");
+    }
+    redirected_calls =
+        makeCalls(failed.calls, failed.calls.size() / 2, id, call_sequence);
+  }
 
-  std::cout << "started sending..." << std::endl;
-
-  if(id != 1)
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-  store.set(std::to_string(id), "ready");
-  for(int i = 1; i < nr_procs; i++)
-  {
+  auto& store = dory::MemoryStore::getInstance();
+  store.set("failure-ready-" + std::to_string(id), "ready");
+  for (int node = 1; node <= replicas; node++) {
     std::string value;
-    while (!store.get(std::to_string(i), value));
-  }
-  uint64_t local_start = std::chrono::duration_cast<std::chrono::microseconds>(
-                   std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-  store.set(std::to_string(id), std::to_string(local_start));
-
-  if(calculate_throughput) {
-    // start reading from the request file
-    while (getline(myfile, line)) {
-    // for(std::string line : requests) {
-      if (unlikely(line.at(0) == '#')) {
-        expected_calls = std::stoi(line.substr(1, line.size()));
-        continue;
-      }
-      // failure
-      if (unlikely(id == failed_node && line.at(0) == 'X')) {
-        std::cout << "stoping heartbeat thread and waiting..." << std::endl;
-        protocol.tob[0]->stopHeartbeatThread();
-        std::this_thread::sleep_for(std::chrono::seconds(60));
-        break;
-      }
-      else
-        if (unlikely(line.at(0) == 'X')) continue;
-
-      std::string sequence_number =
-          std::to_string(id) + "-" + std::to_string(call_id++);
-      MethodCall call = ReplicatedObject::createCall(sequence_number, line);
-      // calculating the response time
-      
-      std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
-          response = protocol.request(call, false, false);
-      // if (response.first == ResponseStatus::NoError)
-        sent++;
+    while (!store.get("failure-ready-" + std::to_string(node), value)) {
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
   }
-  
-  else {
-    // start reading from the request file
-    while (getline(myfile, line)) {
-      if (unlikely(line.at(0) == '#')) {
-        expected_calls = std::stoi(line.substr(1, line.size()));
-        continue;
-      }
-      // failure
-      if (unlikely(id == failed_node && line.at(0) == 'X')) {
-        std::cout << "stoping heartbeat thread and waiting..." << std::endl;
-        protocol.tob[0]->stopHeartbeatThread();
-        std::this_thread::sleep_for(std::chrono::seconds(60));
-        break;
-      }
-      else
-        if (unlikely(line.at(0) == 'X')) continue;
 
-      std::string sequence_number =
-          std::to_string(id) + "-" + std::to_string(call_id++);
-      MethodCall call = ReplicatedObject::createCall(sequence_number, line);
-      // calculating the response time
-      auto start = std::chrono::high_resolution_clock::now();
-      std::pair<ResponseStatus, std::chrono::high_resolution_clock::time_point>
-          response = protocol.request(call, false, false);
-      if (response.first == ResponseStatus::NoError) {
-        sent++;
-        response_times[call.method_type][call.id] =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(response.second -
-                                                                  start)
-                .count();
-      }
+  uint64_t const local_start =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::high_resolution_clock::now().time_since_epoch())
+          .count();
+  uint64_t response_sum_ns = 0;
+  size_t response_count = 0;
+  int own_issued = 0;
+  int redirected_issued = 0;
+  bool failure_observed = false;
+
+  auto issue = [&](MethodCall const& call, int& counter) {
+    auto const start = std::chrono::high_resolution_clock::now();
+    auto const response = protocol.request(call, false, false);
+    if (response.first != ResponseStatus::NoError) {
+      throw std::runtime_error("WRDT request failed during failure experiment");
     }
-  }
-  uint64_t local_end = std::chrono::duration_cast<std::chrono::microseconds>(
-                   std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-  // std::cout << "local_throughput:"
-  //           << static_cast<double>(num_ops)/static_cast<double>(local_end - local_start) << std::endl;
-  std::cout << "issued " << sent << " operations" << std::endl;
-
-
-  if(failed_node) {
-    own_requests_done.store(true);
-    // leader failure
-    if(failed_node == 1) {
-      if (protocol.tob[0]->amILeader()) {
-          // wait for the new leader to finish the remaining operations
-          leaderChange.join();
-          std::cout << "new sent: " << new_sent << std::endl;
-      }
+    if (!calculate_throughput) {
+      response_sum_ns +=
+          std::chrono::duration_cast<std::chrono::nanoseconds>(response.second -
+                                                               start)
+              .count();
+      response_count++;
     }
-    // follower failure
-    else {
-      if (id == failed_node + 1) {
-        followerChange.join();
-        std::cout << "new sent: " << new_sent << std::endl;
-      }
-    }
+    counter++;
+  };
 
+  for (size_t index = 0; index < own_calls.size(); index++) {
+    if (!failure_observed && index == failure_index) {
+      if (id == failed_node) {
+        for (size_t group = 0; group < account.synch_groups.size(); group++) {
+          protocol.tob[group]->stopHeartbeatThread();
+        }
+        store.set(FailureKey, std::to_string(failed_node));
+        std::cout << "failure injected at node " << id << " after "
+                  << own_issued << " local operations" << std::endl;
+        std::cout << "issued before failure " << own_issued << " operations"
+                  << std::endl;
+        std::cout.flush();
+        std::raise(SIGSTOP);
+        std::_Exit(0);
+      }
+      waitForFailure(store);
+      failure_observed = true;
+      std::cout << "failure observed: node " << failed_node << std::endl;
+    }
+    issue(own_calls[index], own_issued);
   }
 
-  std::cout << "calculating statistics" << std::endl;
-  if(!calculate_throughput){
-    double sum = 0;
-    double total_sum = 0;
-    size_t num = 0;
-    for (int i = 0; i < object->num_methods; i++) {
-      total_sum += sum;
-      sum = 0;
-      for (auto& pair : response_times[i]){
-        sum += static_cast<double>(pair.second);
-        num++;
+  if (!failure_observed) {
+    waitForFailure(store);
+    failure_observed = true;
+  }
+
+  if (id == redirector) {
+    if (failed_node == 1) {
+      while (!protocol.tob[0]->amILeader()) {
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
       }
-      std::cout << "average response time for " << response_times[i].size()
-                << " calls to " << i << ": "
-                << (sum/1000) / static_cast<int>(response_times[i].size()) << std::endl;
+      std::cout << "new leader elected: node " << id << std::endl;
     }
-    std::cout << "total average response time for " << num
-              << " calls: " << (total_sum/1000) / static_cast<int>(num) << std::endl;
+    for (auto const& call : redirected_calls) {
+      issue(call, redirected_issued);
+    }
   }
 
-  // wait for all the ops to arrive and then calculate throughput
-  int cs = 0;
-  while (true) {
-    cs = 0;
-    for (int i = 0; i < object->num_methods; i++)
-      for (int x = 0; x < nr_procs; x++) cs += protocol.repl_object->calls_applied[i][x];
-    // std::cout << "received: " << cs << std::endl;
-    if(failed_node == 1){
-      if (cs == ((id == 2) ? (expected_calls - 1) : expected_calls - 2))
-        break;
-    }
-    else{
-      if (cs == ((id != 1) ? (expected_calls - 1) : expected_calls))
-        break;
-    }
-    std::this_thread::sleep_for(std::chrono::microseconds(10));
-  }
+  std::cout << "issued " << own_issued << " own operations" << std::endl;
+  std::cout << "redirected " << redirected_issued << " operations" << std::endl;
+  std::cout << "issued " << own_issued + redirected_issued
+            << " total operations" << std::endl;
+  protocol.flushOrdered();
 
-  uint64_t global_end = std::chrono::duration_cast<std::chrono::microseconds>(
-                   std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+  int applied = 0;
+  do {
+    applied = 0;
+    for (int method = 0; method < account.num_methods; method++) {
+      for (int origin = 0; origin < replicas; origin++) {
+        applied += account.calls_applied[method][origin];
+      }
+    }
+    if (applied < own.expected_writes) {
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+  } while (applied < own.expected_writes);
 
+  uint64_t const global_end =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::high_resolution_clock::now().time_since_epoch())
+          .count();
+  double const average_response_us =
+      response_count == 0
+          ? 0
+          : static_cast<double>(response_sum_ns) / 1000.0 /
+                static_cast<double>(response_count);
+  std::cout << "total average response time for " << response_count
+            << " calls: " << average_response_us << std::endl;
   std::cout << "throughput: "
-            << static_cast<double>(num_ops)/static_cast<double>(global_end - local_start) << std::endl;
+            << static_cast<double>(operations) /
+                   static_cast<double>(global_end - local_start)
+            << std::endl;
+  std::cout << "final state for node " << id << ":" << std::endl;
+  account.toString();
+  std::cout.flush();
 
-  std::this_thread::sleep_for(std::chrono::seconds(60));
-  return 0;
+  store.set("finished-failure-" + std::to_string(id), "ready");
+  for (int node = 1; node <= replicas; node++) {
+    if (node == failed_node) {
+      continue;
+    }
+    std::string value;
+    while (!store.get("finished-failure-" + std::to_string(node), value)) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
+  std::cout << "all surviving nodes finished" << std::endl;
+  std::cout.flush();
+  std::_Exit(0);
 }

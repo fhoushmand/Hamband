@@ -348,6 +348,12 @@ bool ReliableBroadcast::broadcast(uint8_t *payload, size_t length,
 
   int i = 1;
   for (auto &[pid, rc] : ce->connections()) {
+#ifdef HAMBAND_ENABLE_CRDT_FAILURE
+    if (failed_nodes.find(pid) != failed_nodes.end()) {
+      i++;
+      continue;
+    }
+#endif
     auto ok = rc.postSendSingle(
         ReliableConnection::RdmaWrite,
         quorum::pack(quorum::EntryWr, i, req_id), address,
