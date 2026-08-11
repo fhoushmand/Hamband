@@ -303,13 +303,19 @@ def registry_address(node: str) -> str:
 class Registry:
     def __init__(self, node: str, address: str, port: int):
         self.node = node
-        self.endpoint = f"{address}:{port}"
-        self.port = port
+        self.address = address
+        self.base_port = port
+        self.start_count = 0
+        self.endpoint = ""
+        self.port = 0
         self.process: subprocess.Popen[bytes] | None = None
         self.log_handle = None
 
     def start(self, log_path: Path) -> None:
         self.stop()
+        self.start_count += 1
+        self.port = self.base_port + self.start_count
+        self.endpoint = f"{self.address}:{self.port}"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         self.log_handle = log_path.open("wb")
         memcached = os.environ.get(
@@ -334,6 +340,9 @@ exec "$binary" -p {self.port} -U 0 -m 64
             try:
                 address, port = self.endpoint.rsplit(":", 1)
                 with socket.create_connection((address, int(port)), timeout=1):
+                    time.sleep(0.5)
+                    if self.process.poll() is not None:
+                        raise RuntimeError(f"memcached exited; see {log_path}")
                     return
             except OSError:
                 time.sleep(0.25)
@@ -343,7 +352,7 @@ exec "$binary" -p {self.port} -U 0 -m 64
         if self.process is not None and self.process.poll() is None:
             self.process.terminate()
             try:
-                self.process.wait(timeout=10)
+                self.process.wait(timeout=45)
             except subprocess.TimeoutExpired:
                 self.process.kill()
                 self.process.wait(timeout=5)
@@ -409,7 +418,7 @@ def stop_processes(processes: Iterable[subprocess.Popen[bytes]]) -> None:
     running = [process for process in processes if process.poll() is None]
     for process in running:
         process.terminate()
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + 45
     while running and time.monotonic() < deadline:
         running = [process for process in running if process.poll() is None]
         time.sleep(0.1)
