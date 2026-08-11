@@ -225,15 +225,33 @@ int main(int argc, char* argv[]) {
     for (auto const& call : redirected_calls) {
       issue(call, redirected_issued);
     }
-    if (failed_node == 1) {
-      protocol.flushOrdered();
-    }
   }
 
   std::cout << "issued " << own_issued << " own operations" << std::endl;
   std::cout << "redirected " << redirected_issued << " operations" << std::endl;
   std::cout << "issued " << own_issued + redirected_issued
             << " total operations" << std::endl;
+  store.set("issued-failure-" + std::to_string(id), "ready");
+  for (int node = 1; node <= replicas; node++) {
+    if (node == failed_node) {
+      continue;
+    }
+    std::string value;
+    while (!store.get("issued-failure-" + std::to_string(node), value)) {
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+  }
+
+  int const active_leader = failed_node == 1 ? 2 : 1;
+  if (id == active_leader) {
+    protocol.flushOrdered();
+    store.set("ordered-drain-failure", "ready");
+  } else {
+    std::string value;
+    while (!store.get("ordered-drain-failure", value)) {
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+  }
   int applied = 0;
   auto const convergence_deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(30);
