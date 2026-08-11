@@ -543,8 +543,14 @@ def validate_outputs(
     )
     if failed_output.count("failure injected at node") != 1:
         raise RuntimeError("Failed replica did not record exactly one failure")
+    failed_protocol_output = re.sub(
+        r"^srun: Job step aborted: Waiting up to \d+ seconds for job step to finish\.\s*$",
+        "",
+        failed_output,
+        flags=re.MULTILINE,
+    )
     for pattern in BAD_PATTERNS:
-        if pattern.search(failed_output):
+        if pattern.search(failed_protocol_output):
             raise RuntimeError(f"Failed-node log matched {pattern.pattern}")
 
     survivor_ids = [node for node in range(1, REPLICAS + 1) if node != scenario.failed_node]
