@@ -228,6 +228,8 @@ int main(int argc, char* argv[]) {
   std::cout << "issued " << own_issued + redirected_issued
             << " total operations" << std::endl;
   int applied = 0;
+  auto const convergence_deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(30);
   do {
     applied = 0;
     for (int method = 0; method < account.num_methods; method++) {
@@ -236,6 +238,19 @@ int main(int argc, char* argv[]) {
       }
     }
     if (applied < own.expected_writes) {
+      if (std::chrono::steady_clock::now() >= convergence_deadline) {
+        std::cout << "convergence timeout: applied " << applied << " of "
+                  << own.expected_writes << std::endl;
+        for (int method = 0; method < account.num_methods; method++) {
+          for (int origin = 0; origin < replicas; origin++) {
+            std::cout << "applied method " << method << " origin " << origin + 1
+                      << ": " << account.calls_applied[method][origin]
+                      << std::endl;
+          }
+        }
+        account.toString();
+        throw std::runtime_error("Survivors did not apply every Account update");
+      }
       std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
   } while (applied < own.expected_writes);
