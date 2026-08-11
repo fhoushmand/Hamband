@@ -77,6 +77,18 @@ CSV_FIELDS = (
     "measurement_runs",
     "status",
 )
+FAILURE_FIELDS = (
+    "failure_scenario",
+    "failed_node",
+    "failure_injection",
+    "surviving_replicas",
+)
+FAILURE_FIELD_INSERTION = CSV_FIELDS.index("write_percentage") + 1
+COMBINED_CSV_FIELDS = (
+    *CSV_FIELDS[:FAILURE_FIELD_INSERTION],
+    *FAILURE_FIELDS,
+    *CSV_FIELDS[FAILURE_FIELD_INSERTION:],
+)
 
 BAD_LOG_PATTERNS = (
     re.compile(r"segmentation fault", re.IGNORECASE),
@@ -154,8 +166,16 @@ def audit_csv(
 ) -> dict[tuple[str, int, int], dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as source:
         reader = csv.DictReader(source)
-        require(tuple(reader.fieldnames or ()) == CSV_FIELDS, "CSV schema/order is unexpected")
-        rows = list(reader)
+        fields = tuple(reader.fieldnames or ())
+        require(
+            fields in (CSV_FIELDS, COMBINED_CSV_FIELDS),
+            "CSV schema/order is unexpected",
+        )
+        rows = [
+            row
+            for row in reader
+            if row.get("failure_scenario", "") in ("", "none")
+        ]
 
     expected = expected_keys()
     require(len(expected) == 312, "Independent expected matrix is not 312 rows")

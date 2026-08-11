@@ -1,0 +1,34 @@
+Hamband InfiniBand ACES failure matrix
+
+git_commit=c9d46134fd57a617706c703e406ac142e67e40c8
+slurm_job_id=2033631
+slurm_state=COMPLETED
+slurm_exit=0:0
+slurm_elapsed=00:14:04
+registry_node=ac030
+replica_nodes=ac037;ac044;ac107;ac108
+cpu_model=Intel(R) Xeon(R) Platinum 8468
+logical_cpus_per_worker=96
+rdma_device=mlx5_0
+rdma_device_numa=1
+rdma_rate_gbps=200
+cpus_per_process=4
+memory_per_process_gib=16
+compiler=GCC/8.3.0
+runtime=GCCcore/8.3.0
+operations=4000000
+replicas=4
+write_percentages=15;20;25
+failure_scenarios=account-follower;account-leader;twopset-replica
+failed_suffix_policy=redistribute-exactly-once-to-one-survivor
+response_aggregation=arithmetic-mean-of-survivor-local-averages
+throughput_aggregation=minimum-survivor-throughput
+failure_csv_sha256=764ee09c333f9873f33e6c7be0045f120057401ed5e122f40ee1c56ec91ac408
+combined_csv_sha256=424398006ad769ff82db66928bc725f5e4944a47397f700681a65918cede2e95
+ordinary_csv_sha256=b18cbeef9f188c45c6488755269cd7b5e07f879260c74c224f43a0c8e6f8a897
+ordinary_band_sha256=9e1d86de36f0a60ec21ec58e8d3205eca86d5903072434ee16d52b9f33ba5d25
+ordinary_band_crdt_sha256=06da43e71ae1108f828c786d3979f882af0feec00514ebfb614db6c7b397d13c
+band_failure_sha256=65fcd37538cd7ddd4641fd19cd3fce9a6420799eb3434ee55ba9b4d4025aac77
+band_crdt_failure_sha256=f01babec5265d50b0444baff0d563b204766978412df8d8f492013ed3609b188
+validation=PASS rows=321 ordinary=312 failure=9
+correctness=4000000-issued-calls;three-survivors-converged;state-and-workload-digests-match-ordinary-baseline;no-integrity-drops

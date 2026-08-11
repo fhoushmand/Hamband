@@ -277,7 +277,7 @@ GiB broadcast log, and less than 1 GiB of benchmark/application state, leaving
 several GiB of headroom. This changes only the scheduler reservation and does
 not alter protocol memory sizes or execution behavior.
 
-### Completed ACES Run
+### Completed Ordinary ACES Run
 
 The full matrix completed successfully on August 5--6, 2026. Its provenance is:
 
@@ -292,12 +292,11 @@ The full matrix completed successfully on August 5--6, 2026. Its provenance is:
 | Failed/retried configurations | `0` |
 | CSV SHA-256 | `b18cbeef9f188c45c6488755269cd7b5e07f879260c74c224f43a0c8e6f8a897` |
 
-The final CSV is [`results/hamband_infiniband_aces_4m.csv`](results/hamband_infiniband_aces_4m.csv).
-It contains 24 rows for each Figure 9 and Figure 10 workload, plus 36
-rows each for YCSB and SmallBank, for 312 rows total. All rows use 4,000,000
-operations and the same fixed nine-node allocation. The 40K-operation smoke
-phase also passed Account and Counter at 3, 4, and 8 replicas before the full
-matrix began.
+The ordinary matrix contributes 24 rows for each Figure 9 and Figure 10
+workload, plus 36 rows each for YCSB and SmallBank, for 312 rows. All rows use
+4,000,000 operations and the same fixed nine-node allocation. The 40K-operation
+smoke phase also passed Account and Counter at 3, 4, and 8 replicas before the
+full matrix began.
 
 `experiments/audit_hamband_paper_aces.py` independently validates the final
 CSV and retained raw logs. For this run it checked all 312 matrix keys, 468
@@ -321,8 +320,53 @@ python3 experiments/audit_hamband_paper_aces.py \
   --expected-nodes 'ac029;ac046;ac057;ac067;ac088;ac090;ac093;ac105;ac108'
 ```
 
-The audit result was `PASS` with exactly 312 CSV rows, 468 run directories,
-and 2,574 node logs.
+The audit filters the combined CSV to its ordinary rows. Its result was `PASS`
+with exactly 312 ordinary rows, 468 run directories, and 2,574 node logs.
+
+### Completed Four-Replica Failure Run
+
+The combined CSV is
+[`results/hamband_infiniband_aces_4m.csv`](results/hamband_infiniband_aces_4m.csv).
+It has 321 rows: the unchanged 312-row ordinary matrix plus these nine rows at
+15%, 20%, and 25% updates:
+
+| Scenario | Injection | Failed replica | Survivors |
+| --- | --- | ---: | ---: |
+| Account follower-failure | Process stops after half its local operations | 2 | 3 |
+| Account leader-failure | Leader request issuing and heartbeat stop after half its local operations | 1 | 3 |
+| 2P-Set replica-failure | Process stops after half its local operations | 1 | 3 |
+
+The failure matrix ran as Slurm job `2033631` on August 10, 2026 and completed
+in `00:14:04`. One registry and all four workers remained fixed for every row;
+each Hamband process received four CPUs and 16 GiB. The workers used the same
+CPU model, `mlx5_0` InfiniBand device, and NIC NUMA locality (`nic_numa=1`).
+
+The failed node's unissued suffix is reassigned exactly once to one survivor.
+Every valid row issued all 4,000,000 calls, all three survivors converged, and
+its workload and final-state digests equal the corresponding ordinary row.
+No WRDT request was rejected or dropped for an integrity violation. Response
+time is the arithmetic mean of survivor-local averages; throughput is the
+minimum survivor throughput. The leader-failure response timer does not include
+failure detection or leader election, while throughput covers the complete run.
+
+The standalone failure rows are in
+[`results/hamband_infiniband_aces_4m_failures.csv`](results/hamband_infiniband_aces_4m_failures.csv),
+and full run metadata and hashes are in
+[`results/hamband_infiniband_aces_4m_failure_provenance.txt`](results/hamband_infiniband_aces_4m_failure_provenance.txt).
+The combined CSV SHA-256 is
+`424398006ad769ff82db66928bc725f5e4944a47397f700681a65918cede2e95`.
+
+The merge validator checks all 321 rows and requires every failure row to match
+the corresponding no-failure workload and final-state digest:
+
+```bash
+python3 experiments/merge_hamband_failure_results.py \
+  --baseline results/hamband_infiniband_aces_4m.csv \
+  --failures results/hamband_infiniband_aces_4m_failures.csv \
+  --output /tmp/hamband_infiniband_aces_4m.csv
+```
+
+Its result was `PASS rows=321 ordinary=312 failure=9`.
 
 ### Minimal ACES Fixes
 
