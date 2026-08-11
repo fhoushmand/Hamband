@@ -17,18 +17,33 @@ FAILURE_FIELDS = (
     "surviving_replicas",
 )
 EXPECTED = {
-    ("follower-failure", percentage): ("account", "Account follower-failure", "2")
+    ("follower-failure", percentage): (
+        "account",
+        "Account follower-failure",
+        "2",
+        "process-stop-after-half-local-operations",
+    )
     for percentage in (15, 20, 25)
 }
 EXPECTED.update(
     {
-        ("leader-failure", percentage): ("account", "Account leader-failure", "1")
+        ("leader-failure", percentage): (
+            "account",
+            "Account leader-failure",
+            "1",
+            "leader-heartbeat-and-request-stop-after-half-local-operations",
+        )
         for percentage in (15, 20, 25)
     }
 )
 EXPECTED.update(
     {
-        ("replica-failure", percentage): ("twopset", "2P-Set replica-failure", "1")
+        ("replica-failure", percentage): (
+            "twopset",
+            "2P-Set replica-failure",
+            "1",
+            "process-stop-after-half-local-operations",
+        )
         for percentage in (15, 20, 25)
     }
 )
@@ -91,7 +106,7 @@ def validate(
 
     for row in failure_rows:
         key = failure_key(row)
-        usecase, paper_name, failed_node = EXPECTED[key]
+        usecase, paper_name, failed_node, failure_injection = EXPECTED[key]
         require(row["paper_figure"] == "14", f"{key}: wrong paper figure")
         require(row["paper_workload"] == paper_name, f"{key}: wrong paper name")
         require(row["repo_usecase"] == usecase, f"{key}: wrong use case")
@@ -100,7 +115,7 @@ def validate(
         require(row["failed_node"] == failed_node, f"{key}: wrong failed node")
         require(row["surviving_replicas"] == "3", f"{key}: wrong survivor count")
         require(
-            row["failure_injection"] == "heartbeat-stop-after-half-local-operations",
+            row["failure_injection"] == failure_injection,
             f"{key}: wrong failure injection",
         )
         require(row["issued_operations_total"] == "4000000", f"{key}: lost calls")

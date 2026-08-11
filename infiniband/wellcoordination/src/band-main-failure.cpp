@@ -1,3 +1,4 @@
+#include <csignal>
 #include <cstdlib>
 #include <chrono>
 #include <cstdint>
@@ -179,8 +180,10 @@ int main(int argc, char* argv[]) {
   for (size_t index = 0; index < own_calls.size(); index++) {
     if (!failure_observed && index == failure_index) {
       if (id == failed_node) {
-        for (size_t group = 0; group < account.synch_groups.size(); group++) {
-          protocol.tob[group]->stopHeartbeatThread();
+        if (failed_node == 1) {
+          for (size_t group = 0; group < account.synch_groups.size(); group++) {
+            protocol.tob[group]->stopHeartbeatThread();
+          }
         }
         store.set(FailureKey, std::to_string(failed_node));
         std::cout << "failure injected at node " << id << " after "
@@ -188,9 +191,13 @@ int main(int argc, char* argv[]) {
         std::cout << "issued before failure " << own_issued << " operations"
                   << std::endl;
         std::cout.flush();
-        while (true) {
-          std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (failed_node == 1) {
+          while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+          }
         }
+        std::raise(SIGSTOP);
+        std::_Exit(0);
       }
       waitForFailure(store);
       failure_observed = true;
