@@ -227,8 +227,6 @@ int main(int argc, char* argv[]) {
   std::cout << "redirected " << redirected_issued << " operations" << std::endl;
   std::cout << "issued " << own_issued + redirected_issued
             << " total operations" << std::endl;
-  protocol.flushOrdered();
-
   int applied = 0;
   do {
     applied = 0;
