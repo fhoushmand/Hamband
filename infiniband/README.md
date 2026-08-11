@@ -9,6 +9,20 @@ protocol behavior used by the existing InfiniBand experiments. Narrow fixes
 needed for safe replica scaling and the current ACES build environment are
 documented below.
 
+## Published Results
+
+The current complete dataset is
+[`results/hamband_infiniband_aces_4m.csv`](results/hamband_infiniband_aces_4m.csv).
+It contains the 312-row, 3--8 replica no-failure matrix and nine four-replica
+failure rows, for 321 validated rows and 4,000,000 operations per row. Its
+SHA-256 is
+`424398006ad769ff82db66928bc725f5e4944a47397f700681a65918cede2e95`.
+
+The nine failure rows are also available separately in
+[`results/hamband_infiniband_aces_4m_failures.csv`](results/hamband_infiniband_aces_4m_failures.csv).
+The ordinary and failure-run provenance, execution procedure, and validation
+criteria are documented in the ACES Paper Matrix section below.
+
 ## What Is Preserved
 
 The InfiniBand copy retains:

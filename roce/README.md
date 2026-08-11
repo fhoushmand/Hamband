@@ -18,15 +18,28 @@ The initial smoke test used two replicas, failure handling disabled, 100%
 writes, and 1,000,000 total account operations. Both replicas completed and
 converged to the independently verified balance `4752077`.
 
-The paper matrix was completed separately over CPU Soft-RoCE and the Mellanox
-hardware RoCE fabric. Each matrix uses 3 and 4 replicas, 4,000,000 operations
+The paper matrix was completed over CPU Soft-RoCE and two Mellanox hardware
+RoCE configurations. Each matrix uses 3 and 4 replicas, 4,000,000 operations
 per configuration, and all 12 Figure 9--11 workloads. Every workload has 0%,
 15%, 20%, and 25% writes; YCSB and SmallBank additionally have 5% and 50% rows.
 Each published CSV contains all 104 expected configurations.
 
 The hardware matrix uses `mlx5_0` and RoCE-v2 GID index `3` on all four hosts.
 It is a real hardware-RoCE measurement, not RXE/Soft-RoCE. FPGA paths remain
-outside the scope of both datasets.
+outside the scope of these datasets.
+
+### Published Result Files
+
+| Dataset | Setup | Rows | SHA-256 |
+| --- | --- | ---: | --- |
+| [`hamband_hardware_roce_gcc83_4core_paper_4m.csv`](results/hamband_hardware_roce_gcc83_4core_paper_4m.csv) | Hardware RoCE v2, GCC 8.3, four physical cores | 104 | `419b38e18c99f25bd8fa52856e5550a86d6c05e9bfba03e7c1e42bd99aa03660` |
+| [`hamband_hardware_roce_paper_4m.csv`](results/hamband_hardware_roce_paper_4m.csv) | Original hardware RoCE v2 run | 104 | `08b013533081a9f93b637615821a6c7f917e7918a7e32b789e1cd6e44c1ab6a9` |
+| [`hamband_soft_roce_paper_4m.csv`](results/hamband_soft_roce_paper_4m.csv) | CPU Soft-RoCE reference | 104 | `c55b84fbb06a58dfc64202f694831fd85f8a445a86b0dd242e351aa2611380d9` |
+
+The GCC 8.3/four-core hardware dataset is the latest complete RoCE matrix and
+the appropriate result for comparisons that control the compiler generation
+and CPU count against the ACES InfiniBand run. The original hardware and
+Soft-RoCE datasets remain published as historical baselines.
 
 ## Protocol Preservation
 
@@ -473,6 +486,83 @@ key parity with the Soft-RoCE matrix, found a hardware `mlx5_0` marker and no
 error signatures. Raw logs are retained locally under the ignored
 `results/hamband_hardware_roce_paper_4m_logs/` directory.
 
+## GCC 8.3 and Four-Core Matched Hardware Matrix
+
+The separate ACES-setup-matched OCT result is published at
+[`results/hamband_hardware_roce_gcc83_4core_paper_4m.csv`](results/hamband_hardware_roce_gcc83_4core_paper_4m.csv).
+It repeats the exact 104 keys from the hardware matrix above while matching the
+two controlled software-resource settings used by the ACES InfiniBand runs:
+
+- GCC 8.3.0 Release binaries built from unchanged commit `736bbd6`; and
+- four distinct physical CPUs per process, bound to CPUs `1,3,5,7` on OCT
+  socket 1 / NUMA node 1.
+
+The build is isolated in `wellcoordination/build-gcc83`, uses the separate
+Conan cache `$HOME/.conan-hamband-gcc83`, and does not replace the normal GCC 11
+build. `tools/install-gcc83.sh` installs the exact compiler under
+`$HOME/opt/gcc-8.3.0`; `tools/build-gcc83.sh` creates the isolated binaries.
+The complete binary directory was built once on `pc160`, copied to the other
+hosts, and hash-verified before measurement.
+
+No explicit memory binding was requested. Each process was restricted with
+`numactl --physcpubind=1,3,5,7`; these four CPU IDs map to four different
+physical cores on NUMA node 1, where `mlx5_0` is attached. The transport,
+replica prefixes, registry placement, operation count, percentages, workload
+generation, response average, throughput minimum, and correctness gates are
+otherwise identical to the original hardware-RoCE matrix. Physical server and
+fabric differences between OCT and ACES still remain, so this controls the
+compiler and CPU allocation rather than making the clusters identical.
+
+| Property | Value |
+| --- | --- |
+| Completion date | August 10, 2026 |
+| Git commit used by every process | `736bbd6` |
+| Compiler | GCC `8.3.0` |
+| CPU access per process | Four physical cores: `1,3,5,7` |
+| RDMA transport | Hardware RoCE v2, `mlx5_0`, GID index `3` |
+| Valid CSV rows | `104` |
+| Measurement executions | `156` |
+| Replica logs audited | `546` |
+| Invalid or retried configurations | `0` |
+| Canonical LF CSV SHA-256 | `419b38e18c99f25bd8fa52856e5550a86d6c05e9bfba03e7c1e42bd99aa03660` |
+
+The audit found no missing or extra key versus the original hardware CSV, no
+operation-count mismatch, no convergence mismatch, no unfinished node, and no
+crash, timeout, connection, or fatal-error signature. Full setup, binary
+hashes, command line, and audit counts are recorded in
+[`results/hamband_hardware_roce_gcc83_4core_provenance.txt`](results/hamband_hardware_roce_gcc83_4core_provenance.txt).
+
+The independent audit command for this matrix is:
+
+```bash
+python3 experiments/audit_hamband_paper_hardware_roce.py \
+  --csv results/hamband_hardware_roce_gcc83_4core_paper_4m.csv \
+  --soft-roce-csv results/hamband_soft_roce_paper_4m.csv \
+  --log-dir results/hamband_hardware_roce_gcc83_4core_paper_4m_logs \
+  --expected-commit 736bbd6 \
+  --expected-transport RoCEv2-Hardware-mlx5_0-GCC8.3-4physical
+```
+
+To reproduce the isolated build and matched matrix:
+
+```bash
+cd "$HOME/Hamband/roce"
+./tools/build-gcc83.sh
+for host in pc161 pc162 pc163; do
+  rsync -a wellcoordination/build-gcc83/ \
+    "jsaber@$host:/users/jsaber/Hamband/roce/wellcoordination/build-gcc83/"
+done
+
+cd "$HOME/Hamband"
+HAMBAND_COMMIT=736bbd6 \
+HAMBAND_BINARY_DIR=/users/jsaber/Hamband/roce/wellcoordination/build-gcc83/bin \
+HAMBAND_TRANSPORT_LABEL=RoCEv2-Hardware-mlx5_0-GCC8.3-4physical \
+python3 roce/experiments/run_hamband_paper_hardware_roce.py \
+  --cpu-list 1,3,5,7 \
+  --output roce/results/hamband_hardware_roce_gcc83_4core_paper_4m.csv \
+  --log-dir roce/results/hamband_hardware_roce_gcc83_4core_paper_4m_logs
+```
+
 For another hardware RoCE NIC, do not create `rxe0`. Select the hardware verbs
 device and routable RoCE-v2 GID index. The connection code uses GID/GRH
 addressing because the port link layer is Ethernet. Changing the selected
@@ -516,9 +606,9 @@ RDMA provider that can register the requested region.
 ## Current Scope
 
 - Two-node account correctness is validated over CPU Soft-RoCE.
-- The complete 104-row, 3--4 replica paper matrix is validated independently
-  over both CPU Soft-RoCE and hardware RoCE v2.
-- Both published 4-replica matrices co-locate memcached and replica 1 on
+- Complete 104-row, 3--4 replica matrices are validated for CPU Soft-RoCE,
+  the original hardware-RoCE setup, and the GCC 8.3/four-core hardware setup.
+- All published 4-replica matrices co-locate memcached and replica 1 on
   `pc160`; neither uses a separate fifth registry host.
 - FPGA paths were intentionally excluded.
 - Replica counts above four have not been measured on RoCE.

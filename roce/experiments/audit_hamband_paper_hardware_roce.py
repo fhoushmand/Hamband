@@ -145,6 +145,7 @@ def audit_csv(
     path: Path,
     commit: str,
     soft_roce_path: Path,
+    transport: str,
 ) -> dict[tuple[str, int, int], dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as source:
         reader = csv.DictReader(source)
@@ -174,7 +175,7 @@ def audit_csv(
         require(row["paper_workload"] == workload.paper_name, f"{label} workload mismatch")
         require(row["rdt_kind"] == workload.kind, f"{label} RDT kind mismatch")
         require(
-            row["transport"] == "RoCEv2-Hardware-mlx5_0",
+            row["transport"] == transport,
             f"{label} transport mismatch",
         )
         require(row["commit"] == commit, f"{label} commit mismatch")
@@ -366,12 +367,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--soft-roce-csv", type=Path, required=True)
     parser.add_argument("--log-dir", type=Path, required=True)
     parser.add_argument("--expected-commit", required=True)
+    parser.add_argument(
+        "--expected-transport",
+        default="RoCEv2-Hardware-mlx5_0",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    rows = audit_csv(args.csv, args.expected_commit, args.soft_roce_csv)
+    rows = audit_csv(
+        args.csv,
+        args.expected_commit,
+        args.soft_roce_csv,
+        args.expected_transport,
+    )
     run_directories, node_logs = audit_logs(args.log_dir, rows)
     require(run_directories == 156, "Expected exactly 156 measurement executions")
     require(node_logs == 546, "Expected exactly 546 replica logs")

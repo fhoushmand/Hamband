@@ -1,0 +1,77 @@
+Hamband OCT hardware-RoCE GCC 8.3 / four-core matrix provenance
+================================================================
+
+Completion date: 2026-08-10
+Source commit used by every process: 736bbd6
+Protocol source changes for this rerun: none
+
+Result
+------
+CSV: hamband_hardware_roce_gcc83_4core_paper_4m.csv
+Canonical LF CSV SHA-256: 419b38e18c99f25bd8fa52856e5550a86d6c05e9bfba03e7c1e42bd99aa03660
+Rows: 104 valid rows, 104 unique matrix keys
+Operations: 4,000,000 issued operations in every measurement execution
+Replicas: 3 and 4
+Writes: 0%, 15%, 20%, and 25% for all workloads; 5% and 50% also
+        for YCSB and SmallBank
+Failure injection: disabled
+Response aggregation: arithmetic mean across active replicas
+Throughput aggregation: minimum across active replicas
+CRDT measurement: one combined response/throughput execution
+WRDT measurement: separate response and throughput executions
+
+Matched execution setup
+-----------------------
+Compiler: g++-8 (Ubuntu 8.3.0-6ubuntu1) 8.3.0
+Build type: Release
+Compiler location on build host: /users/jsaber/opt/gcc-8.3.0/bin/g++
+Isolated Conan cache: /users/jsaber/.conan-hamband-gcc83
+Binary directory: /users/jsaber/Hamband/roce/wellcoordination/build-gcc83/bin
+CPU binding per process: numactl --physcpubind=1,3,5,7
+Physical CPU mapping: four distinct cores on socket 1 / NUMA node 1
+Explicit memory binding: none
+
+The source was built once on pc160. The complete binary directory was copied
+to pc161-pc163, and the protocol binary hashes were verified on all four hosts:
+
+band:
+  6dd0ab3533eaf1cc5675cb02644c4b20543226b4909f0235a5389c0e95f4efb0
+band-crdt:
+  1a3ba7a63d273df6bf596b61b7ebe1cb6b92430948a95e0de8dd2d8462d5f3af
+
+Transport and hosts
+-------------------
+Hosts: pc160, pc161, pc162, pc163
+3-replica prefix: pc160-pc162
+4-replica set: pc160-pc163
+Verbs device: mlx5_0
+Port: 1, ACTIVE, Ethernet link layer, active MTU 4096
+GID index: 3, RoCE v2
+Registry: pc160 at 198.22.255.171:9999, co-located with replica 1
+
+Validation
+----------
+Expected matrix keys: 104
+CSV rows / unique keys: 104 / 104
+Missing or extra keys versus hamband_hardware_roce_paper_4m.csv: 0 / 0
+Measurement executions: 156
+Replica logs: 546
+Runs with an issued-operation total other than 4,000,000: 0
+Runs without matching replica state digests: 0
+Unfinished node logs: 0
+Crash, timeout, connection, or fatal-error signatures: 0
+
+The earlier published hardware-RoCE result was not modified:
+
+hamband_hardware_roce_paper_4m.csv SHA-256:
+  08b013533081a9f93b637615821a6c7f917e7918a7e32b789e1cd6e44c1ab6a9
+
+Runner command
+--------------
+HAMBAND_COMMIT=736bbd6 \
+HAMBAND_BINARY_DIR=/users/jsaber/Hamband/roce/wellcoordination/build-gcc83/bin \
+HAMBAND_TRANSPORT_LABEL=RoCEv2-Hardware-mlx5_0-GCC8.3-4physical \
+python3 roce/experiments/run_hamband_paper_hardware_roce.py \
+  --cpu-list 1,3,5,7 \
+  --output roce/results/hamband_hardware_roce_gcc83_4core_paper_4m.csv \
+  --log-dir roce/results/hamband_hardware_roce_gcc83_4core_paper_4m_logs

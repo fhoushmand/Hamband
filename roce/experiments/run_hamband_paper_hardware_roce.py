@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import os
 import re
 import shlex
@@ -59,9 +60,46 @@ EXTRA_PERCENTAGES = (5, 50)
 REPLICA_COUNTS = (3, 4)
 COMMIT = os.environ.get("HAMBAND_COMMIT") or local_commit()
 REMOTE_ROOT = os.environ.get("HAMBAND_REMOTE_ROOT", "/users/jsaber/Hamband/roce")
+REMOTE_BINARY_DIR = os.environ.get(
+    "HAMBAND_BINARY_DIR", f"{REMOTE_ROOT}/wellcoordination/build/bin"
+)
 REGISTRY_IP = os.environ.get("HAMBAND_REGISTRY_IP", "198.22.255.171")
+REGISTRY_CPU = os.environ.get("HAMBAND_REGISTRY_CPU", "")
 RDMA_DEVICE = os.environ.get("HAMBAND_RDMA_DEVICE", "mlx5_0")
 GID_INDEX = int(os.environ.get("HAMBAND_GID_INDEX", "3"))
+CPU_LIST = os.environ.get("HAMBAND_CPU_LIST", "")
+MEMORY_NODE = os.environ.get("HAMBAND_MEMORY_NODE", "")
+TRANSPORT_LABEL = os.environ.get(
+    "HAMBAND_TRANSPORT_LABEL", "RoCEv2-Hardware-mlx5_0"
+)
+PROCESS_LD_LIBRARY_PATH = os.environ.get("HAMBAND_PROCESS_LD_LIBRARY_PATH", "")
+CXX_RUNTIME_LIBSTDCPP_SHA256 = os.environ.get(
+    "HAMBAND_CXX_RUNTIME_LIBSTDCPP_SHA256", ""
+)
+CXX_RUNTIME_LIBGCC_SHA256 = os.environ.get(
+    "HAMBAND_CXX_RUNTIME_LIBGCC_SHA256", ""
+)
+
+
+def source_manifest_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    paths = sorted(
+        (
+            path
+            for directory in ("src", "benchmark")
+            for path in (root / "wellcoordination" / directory).rglob("*")
+            if path.is_file() and not path.name.endswith(".swp")
+        ),
+        key=lambda path: path.relative_to(root).as_posix(),
+    )
+    for path in paths:
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+SOURCE_MANIFEST_DIGEST = source_manifest_digest(REPO_ROOT)
 DEFAULT_HOSTS = (
     "jsaber@pc160.cloudlab.umass.edu",
     "jsaber@pc161.cloudlab.umass.edu",
@@ -194,20 +232,102 @@ def require_success(
 
 
 def verify_cluster() -> None:
+    if bool(CXX_RUNTIME_LIBSTDCPP_SHA256) != bool(CXX_RUNTIME_LIBGCC_SHA256):
+        raise RuntimeError("Both C++ runtime hashes must be set together")
+    if CXX_RUNTIME_LIBSTDCPP_SHA256 and not PROCESS_LD_LIBRARY_PATH:
+        raise RuntimeError("Strict C++ runtime validation requires LD_LIBRARY_PATH")
+    executables = " ".join(
+        shlex.quote(item.generator) for item in WORKLOADS
+    )
     script = f"""
 set -e
 test "$(git -C "$HOME/Hamband" rev-parse --short HEAD)" = "{COMMIT}"
-test -x "{REMOTE_ROOT}/wellcoordination/build/bin/band"
-test -x "{REMOTE_ROOT}/wellcoordination/build/bin/band-crdt"
+test -x "{REMOTE_BINARY_DIR}/band"
+test -x "{REMOTE_BINARY_DIR}/band-crdt"
+process_ld={shlex.quote(PROCESS_LD_LIBRARY_PATH)}
+expected_libstdcpp={shlex.quote(CXX_RUNTIME_LIBSTDCPP_SHA256)}
+expected_libgcc={shlex.quote(CXX_RUNTIME_LIBGCC_SHA256)}
+for executable in band band-crdt {executables}; do
+  binary="{REMOTE_BINARY_DIR}/$executable"
+  test -x "$binary"
+  ldd_output=$(LD_LIBRARY_PATH="$process_ld" ldd "$binary" 2>&1)
+  ! grep -Fq 'not found' <<<"$ldd_output"
+  ! objdump -T "$binary" | grep -Fq GLIBCXX_3.4.30
+done
+band_ldd=$(LD_LIBRARY_PATH="$process_ld" ldd "{REMOTE_BINARY_DIR}/band" 2>&1)
+libstdcpp=$(awk '$1 == "libstdc++.so.6" {{print $3}}' <<<"$band_ldd")
+libgcc=$(awk '$1 == "libgcc_s.so.1" {{print $3}}' <<<"$band_ldd")
+test -f "$libstdcpp"
+test -f "$libgcc"
+libstdcpp_sha=$(sha256sum "$(readlink -f "$libstdcpp")" | awk '{{print $1}}')
+libgcc_sha=$(sha256sum "$(readlink -f "$libgcc")" | awk '{{print $1}}')
+if [[ -n "$expected_libstdcpp" ]]; then
+  test "$libstdcpp_sha" = "$expected_libstdcpp"
+  test "$libgcc_sha" = "$expected_libgcc"
+fi
+printf 'cxx-runtime: %s %s\n' "$libstdcpp_sha" "$libgcc_sha"
 rdma link show | grep -q "{RDMA_DEVICE}/1 state ACTIVE"
 test "$(basename "$(readlink -f /sys/class/infiniband/{RDMA_DEVICE}/device/driver)")" = "mlx5_core"
 test "$(cat /sys/class/infiniband/{RDMA_DEVICE}/ports/1/gid_attrs/types/{GID_INDEX})" = "RoCE v2"
 grep -Eq '(^|:)ffff:' /sys/class/infiniband/{RDMA_DEVICE}/ports/1/gids/{GID_INDEX}
 ibv_devinfo -d {RDMA_DEVICE} -i 1 | grep -q 'state:[[:space:]]*PORT_ACTIVE'
 ibv_devinfo -d {RDMA_DEVICE} -i 1 | grep -q 'link_layer:[[:space:]]*Ethernet'
+python3 - "{REMOTE_ROOT}" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+digest = hashlib.sha256()
+paths = sorted(
+    (
+        path
+        for directory in ("src", "benchmark")
+        for path in (root / "wellcoordination" / directory).rglob("*")
+        if path.is_file() and not path.name.endswith(".swp")
+    ),
+    key=lambda path: path.relative_to(root).as_posix(),
+)
+for path in paths:
+    digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+    digest.update(bytes([0]))
+    digest.update(path.read_bytes())
+print("source-manifest: " + digest.hexdigest())
+PY
 """
     results = parallel_ssh(HOSTS, [script] * len(HOSTS), 30)
     require_success(results, "cluster verification")
+    manifests = []
+    runtimes = []
+    for result in results:
+        matches = re.findall(
+            r"^source-manifest:\s*([0-9a-f]{64})$", result.stdout, re.MULTILINE
+        )
+        if len(matches) != 1:
+            raise RuntimeError("Could not verify the remote source manifest")
+        manifests.append(matches[0])
+        runtime_matches = re.findall(
+            r"^cxx-runtime:\s*([0-9a-f]{64})\s+([0-9a-f]{64})$",
+            result.stdout,
+            re.MULTILINE,
+        )
+        if len(runtime_matches) != 1:
+            raise RuntimeError("Could not verify the remote C++ runtime")
+        runtimes.append(runtime_matches[0])
+    if set(manifests) != {SOURCE_MANIFEST_DIGEST}:
+        raise RuntimeError(
+            "OCT source manifests differ from the local experiment source: "
+            + repr(manifests)
+        )
+    if len(set(runtimes)) != 1:
+        raise RuntimeError("OCT C++ runtimes differ: " + repr(runtimes))
+    if CXX_RUNTIME_LIBSTDCPP_SHA256:
+        expected_runtime = (
+            CXX_RUNTIME_LIBSTDCPP_SHA256,
+            CXX_RUNTIME_LIBGCC_SHA256,
+        )
+        if set(runtimes) != {expected_runtime}:
+            raise RuntimeError("OCT C++ runtime differs from the requested hashes")
 
 
 def generate_workload(workload: Workload, replicas: int, percentage: int) -> None:
@@ -224,18 +344,35 @@ WORKLOAD="$ROOT/wellcoordination/workload"
 DIR="$WORKLOAD/{config}/{workload.usecase}"
 rm -rf "$DIR"
 HAMBAND_WORKLOAD_DIR="$WORKLOAD" \
-  "$ROOT/wellcoordination/build/bin/{workload.generator}" \
+  LD_LIBRARY_PATH={shlex.quote(PROCESS_LD_LIBRARY_PATH)} \
+  "{REMOTE_BINARY_DIR}/{workload.generator}" \
   {replicas} {OPERATIONS} {percentage}
 test "$(find "$DIR" -maxdepth 1 -type f -name '*.txt' | wc -l)" -eq {replicas}
 test "$(grep -h -v '^#' "$DIR"/*.txt | grep -c '.')" -eq {OPERATIONS}
 test "$(grep -h '^#' "$DIR"/*.txt | sort -u)" = "#{writes}"
 sha256sum "$DIR"/*.txt
+python3 - "$DIR" {replicas} <<'PY'
+import hashlib
+import pathlib
+import sys
+
+directory = pathlib.Path(sys.argv[1])
+replicas = int(sys.argv[2])
+digest = hashlib.sha256()
+for node in range(1, replicas + 1):
+    path = directory / f"{{node}}.txt"
+    digest.update(path.name.encode("ascii"))
+    digest.update(bytes([0]))
+    digest.update(path.read_bytes())
+print(f"workload-digest: {{digest.hexdigest()}}")
+PY
 """
         )
     results = parallel_ssh(hosts, scripts, 600)
     require_success(results, f"workload generation for {config}/{workload.usecase}")
 
     hashes = []
+    workload_digests = []
     for result in results:
         node_hashes = [
             line.split()[0]
@@ -245,8 +382,16 @@ sha256sum "$DIR"/*.txt
         if len(node_hashes) != replicas:
             raise RuntimeError("Could not verify every generated workload file")
         hashes.append(node_hashes)
+        digest_matches = re.findall(
+            r"^workload-digest:\s*([0-9a-f]{64})$", result.stdout, re.MULTILINE
+        )
+        if len(digest_matches) != 1:
+            raise RuntimeError("Could not extract the aggregate workload digest")
+        workload_digests.append(digest_matches[0])
     if any(node_hashes != hashes[0] for node_hashes in hashes[1:]):
         raise RuntimeError("Generated workload files differ between replicas")
+    if len(set(workload_digests)) != 1:
+        raise RuntimeError("Aggregate workload digests differ between replicas")
 
 
 def stop_experiment_processes() -> None:
@@ -258,14 +403,25 @@ pkill -u "$USER" -x timeout 2>/dev/null || true
     parallel_ssh(HOSTS, [script] * len(HOSTS), 30)
 
 
+def stop_registry() -> None:
+    script = """
+pkill -u "$USER" -x memcached 2>/dev/null || true
+rm -f /tmp/hamband-memcached.pid
+"""
+    ssh_run(HOSTS[0], script, 30)
+
+
 def restart_registry() -> None:
     stop_experiment_processes()
+    cpu_prefix = (
+        f"taskset -c {shlex.quote(REGISTRY_CPU)} " if REGISTRY_CPU else ""
+    )
     script = f"""
 set -e
 pkill -u "$USER" -x memcached 2>/dev/null || true
 rm -f /tmp/hamband-memcached.pid /tmp/hamband-memcached.log
 for attempt in $(seq 1 10); do
-  nohup memcached -l {REGISTRY_IP} -p 9999 -U 0 -m 64 \
+  nohup {cpu_prefix}memcached -l {REGISTRY_IP} -p 9999 -U 0 -m 64 \
     > /tmp/hamband-memcached.log 2>&1 < /dev/null &
   echo $! > /tmp/hamband-memcached.pid
   sleep 1
@@ -290,17 +446,27 @@ def run_replicas(
     restart_registry()
     hosts = HOSTS[:replicas]
     scripts = []
+    execution_prefix: list[str] = []
+    if CPU_LIST or MEMORY_NODE:
+        execution_prefix.append("numactl")
+        if CPU_LIST:
+            execution_prefix.append(f"--physcpubind={shlex.quote(CPU_LIST)}")
+        if MEMORY_NODE:
+            execution_prefix.append(f"--membind={shlex.quote(MEMORY_NODE)}")
+    execution = " ".join(execution_prefix)
+    if execution:
+        execution += " "
     for node_id in range(1, replicas + 1):
         if workload.kind == "CRDT":
             invocation = (
-                f'"$ROOT/wellcoordination/build/bin/band-crdt" '
+                f'"{REMOTE_BINARY_DIR}/band-crdt" '
                 f"{node_id} {replicas} {OPERATIONS} {percentage} "
                 f"{workload.usecase} 0"
             )
         else:
             throughput_flag = 1 if mode == "throughput" else 0
             invocation = (
-                f'"$ROOT/wellcoordination/build/bin/band" '
+                f'"{REMOTE_BINARY_DIR}/band" '
                 f"{node_id} {replicas} {OPERATIONS} {percentage} "
                 f"{workload.usecase} {throughput_flag} 0"
             )
@@ -312,7 +478,8 @@ export DORY_RDMA_DEVICE={RDMA_DEVICE}
 export DORY_GID_INDEX={GID_INDEX}
 export DORY_REGISTRY_IP={REGISTRY_IP}:9999
 export HAMBAND_WORKLOAD_DIR="$ROOT/wellcoordination/workload"
-timeout --signal=TERM --kill-after=10s {timeout}s {invocation}
+export LD_LIBRARY_PATH={shlex.quote(PROCESS_LD_LIBRARY_PATH)}
+timeout --signal=TERM --kill-after=10s {timeout}s {execution}{invocation}
 """
         )
 
@@ -448,7 +615,7 @@ def make_row(
         "paper_workload": workload.paper_name,
         "repo_usecase": workload.usecase,
         "rdt_kind": workload.kind,
-        "transport": "RoCEv2-Hardware-mlx5_0",
+        "transport": TRANSPORT_LABEL,
         "commit": COMMIT,
         "replicas": replicas,
         "operations": OPERATIONS,
@@ -481,12 +648,29 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--reuse-commit", action="append", default=[])
     parser.add_argument("--timeout", type=int, default=3600)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--log-dir", type=Path)
+    parser.add_argument("--cpu-list")
+    parser.add_argument("--memory-node", type=int, choices=(0, 1))
+    parser.add_argument("--transport-label")
     return parser.parse_args()
 
 
 def main() -> int:
+    global CPU_LIST, MEMORY_NODE, TRANSPORT_LABEL, CSV_PATH, LOG_DIR
     args = parse_args()
+    if args.cpu_list is not None:
+        CPU_LIST = args.cpu_list
+    if args.memory_node is not None:
+        MEMORY_NODE = str(args.memory_node)
+    if args.transport_label is not None:
+        TRANSPORT_LABEL = args.transport_label
+    if args.output is not None:
+        CSV_PATH = args.output.resolve()
+    if args.log_dir is not None:
+        LOG_DIR = args.log_dir.resolve()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     verify_cluster()
 
@@ -577,6 +761,7 @@ def main() -> int:
         )
 
     stop_experiment_processes()
+    stop_registry()
     print(f"Completed. CSV: {CSV_PATH}", flush=True)
     return 0
 
@@ -587,4 +772,5 @@ if __name__ == "__main__":
     except Exception as error:
         print(f"ERROR: {error}", file=sys.stderr, flush=True)
         stop_experiment_processes()
+        stop_registry()
         raise
